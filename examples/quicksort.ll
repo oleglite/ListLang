@@ -1,7 +1,7 @@
 ﻿List quickSort(List l) {
 	// Разделить список l на два содрежащих элементы меньше pivot и больше, pivot не должен находиться в l 
 	List divide(List l, Element pivot, List low, List high) {
-		if empty l {
+		if not l {
 			return [low, high]
 		} elif l[0] < pivot {
 			return divide(l[1:], pivot, low + l[0], high)
@@ -10,13 +10,13 @@
 		}
 	}
 	
-	if empty l {
+	if not l {
 		return l
 	} else {
 		pivot = l[0]
 		equals = List(pivot) * count(l, pivot)
 		l = l / pivot
-		parts = divide(l, pivot, List(), List())
+		parts = divide(l, pivot, [], [])
 		return quickSort(parts[0]) + equals + quickSort(parts[1])
 	}
 }

@@ -1,6 +1,6 @@
 ﻿List reverse(List l) {
-	result = List()
-	while not empty l {
+	result = []
+	while l {
 		result = l[0] + result
 		--l
 	}
