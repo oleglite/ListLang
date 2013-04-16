@@ -1,6 +1,7 @@
 antlr_rebuild.bat
 tmp/
 src/generated/
+src/output/
 
 ######################## Python
 *.py[cod]

@@ -6,18 +6,42 @@ options {
 }
 
 tokens {
-	PROGRAM; FUNCTION; PARAM; CALL; CAST; SLICE; LIST_MAKER;
-	PRE_INCR; PRE_DECR;
+	SLIST;		// statement list
+	FUNCTION;	// function definition
+	PARAM;		// parameter definiiton
+	CALL;		// call function expression
+	CAST;		// cast expression
+	SLICE;		// slice expression
+	LIST_MAKER;	// list maker expression
+	PRE_INCR;	// prefix increment expression
+	PRE_DECR;	// prefix decrement expression
+}
+
+@header {
+	import antlr3
+}
+
+@members {
+	errors = 0
+	
+	def emitErrorMessage(self, msg):
+		self.errors += 1
+		sys.stderr.write(msg + '\n')
+	
+	#antlr3.BaseRecognizer.emitErrorMessage = emitErrorMessage
 }
 
 program
-	:	statement+ -> ^( PROGRAM statement+ )
+	:	slist
+	;
+	
+slist
+	:	( statement ( NEWLINE+ | EOF ) )+ -> ^( SLIST statement+ )
 	;
 
 statement
 	:	function
 	|	operation
-	|	NEWLINE!
 	;
 
 function
@@ -33,7 +57,7 @@ param
 	;
 
 block
-	:	'{' NEWLINE statement+ '}' -> ^( PROGRAM statement+ )
+	:	'{' NEWLINE slist '}' -> slist
 	;
 
 operation
@@ -41,11 +65,11 @@ operation
 	;
 
 print_operation
-	:	PRINT^ args_list NEWLINE!
+	:	PRINT^ args_list
 	;
 
 return_operation
-	:	RETURN^ rvalue NEWLINE!
+	:	RETURN^ rvalue
 	;
 
 global_operation
@@ -61,7 +85,7 @@ while_operation
 	;
 
 for_operation
-	:	FOR^ ID 'in' ID block
+	:	FOR^ ID 'in'! rvalue block
 	;
 
 if_operation
@@ -77,12 +101,12 @@ else_operation
 	;
 
 expr
-	:	assignment_expr NEWLINE -> assignment_expr
-	| 	rvalue NEWLINE -> rvalue
+	:	assignment_expr
+	| 	rvalue
 	;
 
 assignment_expr
-	:	TYPE? ID ASS_OP^ rvalue
+	:	ID ASS_OP^ rvalue
 	;
 
 rvalue
@@ -114,18 +138,18 @@ multiplicative_expr
 	;
 
 prefix_expr
-	:	INCR prefix_expr -> ^( PRE_INCR prefix_expr )
-	|	DECR prefix_expr -> ^( PRE_DECR prefix_expr )
+	:	INCR_OP prefix_expr -> ^( PRE_INCR prefix_expr )
+	|	DECR_OP prefix_expr -> ^( PRE_DECR prefix_expr )
 	|	unary_expr
 	;
 
 unary_expr
-	: 	NOT^ unary_expr
+	: 	NOT_OP^ unary_expr
 	|	postfix_expr
 	;
 
 postfix_expr
-	:	primary_expr ( ( INCR | DECR )^ )*
+	:	primary_expr ( ( INCR_OP | DECR_OP )^ )*
 	;
 
 primary_expr
@@ -151,7 +175,7 @@ args_list
 	;
 
 slice_expr
-	:	ID '[' rvalue ( ':' rvalue? )? ']' -> ^( SLICE ID rvalue ':'? rvalue? )
+	:	ID '[' rvalue ( ':' rvalue? )? ']' -> ^( SLICE ID rvalue rvalue? )
 	;
 
 element_literal
@@ -208,13 +232,13 @@ ADD_OP	:	'+' | '-'
 MUL_OP	:	'*' | '/' | '%'
 	;
 
-INCR	:	'++'
+INCR_OP	:	'++'
 	;
 
-DECR	:	'--'
+DECR_OP	:	'--'
 	;
 
-NOT	:	'not'
+NOT_OP	:	'not'
 	;
 
 TYPE
@@ -231,7 +255,7 @@ COMMENT	:   '//' ~('\n'|'\r')* ('\r')? '\n' {$channel=HIDDEN;}
 	|   '/*' ( options {greedy=false;} : . )* '*/' {$channel=HIDDEN;}
 	;
 
-WS 	: (' ' | '\t')+ {$channel=HIDDEN;}
+WS 	: ('\ufeff' | ' ' | '\t')+ {$channel=HIDDEN;}
 	;
 
 NEWLINE : (('\r')? '\n' )+
