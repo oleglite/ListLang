@@ -11,9 +11,9 @@ import antlr3
 import antlr3.tree
 from antlr3.dottreegen import DOTTreeGenerator
 
-from generated.ListLangLexer import ListLangLexer
-from generated.ListLangParser import ListLangParser
-from generated.ListLangWalker import ListLangWalker
+from ListLangLexer import ListLangLexer
+from ListLangParser import ListLangParser
+from ListLangWalker import ListLangWalker
 
 
 
@@ -37,14 +37,15 @@ def getChildren(tree):
 
 
 def test_examples(examples_dir):
-	# FIXME: реализовать функцию
+    # FIXME: реализовать функцию
     pass
 
-	
+
 def main():
     # Parse command line arguments
     args_parser = argparse.ArgumentParser(description='Compile listlang source files.')
     args_parser.add_argument('src_filename', type=str, help='path to source file')
+    args_parser.add_argument('dest_filename', type=str, help='path to output compiled file')
     args_parser.add_argument('--tokens', '-t', dest='tokens_filename', help='write token stream to file')
     args_parser.add_argument('--expamles', '-e', dest='examples_dir', help='try to parse examples, print errors if exists')
     args = args_parser.parse_args()
@@ -72,11 +73,15 @@ def main():
         print 'Total: %d errors' % parser.errors
         sys.exit(1)
     '''
-    try:
-        walker.program()
-    except Exception as e:
-        print e
-        sys.exit(0)
+    #try:
+    target_file = open(args.dest_filename, 'w')
+    target_code = walker.program()
+    if target_code:
+        target_file.write(target_code)
+        print 'target generated'
+# except Exception as e:
+    #     print 'Exception', type(e)
+    #     sys.exit(0)
 
 
 

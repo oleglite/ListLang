@@ -32,11 +32,11 @@ tokens {
 }
 
 program
-	:	slist
+	:	 slist
 	;
 	
 slist
-	:	( statement ( NEWLINE+ | EOF ) )+ -> ^( SLIST statement+ )
+	:	NEWLINE? ( statement ( NEWLINE+ | EOF ) )+ -> ^( SLIST statement+ )
 	;
 
 statement
@@ -45,11 +45,11 @@ statement
 	;
 
 function
-	:	TYPE ID '(' params_list ')' block -> ^( FUNCTION TYPE ID params_list? block )
+	:	TYPE ID L_BRACKET params_list R_BRACKET block -> ^( FUNCTION TYPE ID params_list? block )
 	;
 
 params_list
-	:	( param ( ',' param )* )? -> param*
+	:	( param ( COMMA param )* )? -> param*
 	;
 
 param
@@ -57,7 +57,7 @@ param
 	;
 
 block
-	:	'{' NEWLINE slist '}' -> slist
+	:	L_CURLY_BRACKET NEWLINE slist R_CURLY_BRACKET -> slist
 	;
 
 operation
@@ -85,7 +85,7 @@ while_operation
 	;
 
 for_operation
-	:	FOR^ ID 'in'! rvalue block
+	:	FOR^ ID IN! rvalue block
 	;
 
 if_operation
@@ -158,24 +158,24 @@ primary_expr
 	|	slice_expr
 	|	element_literal
 	|	list_maker
-	|	'(' rvalue ')' -> rvalue
+	|	L_BRACKET rvalue R_BRACKET -> rvalue
 	|	ID
 	;
 
 call_expr
-	:	ID  '(' args_list ')' -> ^( CALL ID args_list? )
+	:	ID  L_BRACKET args_list R_BRACKET -> ^( CALL ID args_list? )
 	;
 
 cast_expr
-	:	TYPE '(' rvalue ')' -> ^( CAST TYPE rvalue )
+	:	TYPE L_BRACKET rvalue R_BRACKET -> ^( CAST TYPE rvalue )
 	;
 
 args_list
-	:	( rvalue ( ',' rvalue )* )? -> rvalue*
+	:	( rvalue ( COMMA rvalue )* )? -> rvalue*
 	;
 
 slice_expr
-	:	ID '[' rvalue ( ':' rvalue? )? ']' -> ^( SLICE ID rvalue rvalue? )
+	:	ID L_SQUARE_BRACKET rvalue ( COLON rvalue? )? R_SQUARE_BRACKET -> ^( SLICE ID rvalue rvalue? )
 	;
 
 element_literal
@@ -183,7 +183,39 @@ element_literal
 	;
 
 list_maker
-	:	'[' args_list ']' -> ^( LIST_MAKER args_list? )
+	:	L_SQUARE_BRACKET args_list R_SQUARE_BRACKET -> ^( LIST_MAKER args_list? )
+	;	
+	
+
+L_BRACKET
+	:	'('
+	;
+	
+R_BRACKET
+	:	')'
+	;
+	
+L_CURLY_BRACKET
+	:	'{'
+	;
+	
+R_CURLY_BRACKET
+	:	'}'
+	;
+	
+L_SQUARE_BRACKET
+	:	'['
+	;
+	
+R_SQUARE_BRACKET
+	:	']'
+	;
+	
+COMMA
+	:	','
+	;
+	
+COLON	:	':'
 	;
 
 
@@ -200,6 +232,9 @@ WHILE	:	'while'
 	;
 
 FOR	:	'for'
+	;
+	
+IN	:	'in'
 	;
 
 IF	:	'if'
