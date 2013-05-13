@@ -1,7 +1,10 @@
-antlr_rebuild.bat
 tmp/
-src/generated/
-src/output/
+
+# generated files
+src/ListLangLexer.py
+src/ListLangParser.py
+src/ListLangWalker.py
+src/*.tokens
 
 ######################## Python
 *.py[cod]

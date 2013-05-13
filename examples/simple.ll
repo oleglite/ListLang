@@ -1,6 +1,9 @@
-el = 5
-//ыва
-list = [1, 2, 3]
 
-print el
-print list
+13
+el = [1, 2]
+abc = el
+
+Element test(Element e) {
+	x = e
+	return x
+}
