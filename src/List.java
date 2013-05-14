@@ -7,8 +7,6 @@ public class List {
 	private LinkedList<Integer> mList = new LinkedList<Integer>();
 	
 	public List() {
-		System.out.print(mList.size());
-		System.out.println(" hell");
 	}
 	
 	public void print() {		
@@ -19,7 +17,7 @@ public class List {
 				str += ", " + mList.get(i).toString();
 			}
 		}
-		System.out.println("[" + str + "]");
+		System.out.print("[" + str + "]");
 	}
 	
 	public List clone() {
@@ -49,6 +47,10 @@ public class List {
 	
 	public boolean boolean_value() {
 		return !mList.isEmpty();
+	}
+	
+	public int to_int() {
+		return boolean_value() ? 1 : 0;
 	}
 	
 	// expressions

@@ -26,7 +26,7 @@ class Scope:
         self.code_maker = jtrans.JCodeMaker()
 
     def add_function(self, f_id, f_type, f_params, f_scope):
-        log('%i function' % f_scope.num)
+        log('%i function' % f_scope.scope_number)
         self.funcs.append((f_id, f_type, f_params, f_scope))
 
     def add_var(self, var_id, var_type):

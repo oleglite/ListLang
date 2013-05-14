@@ -24,7 +24,6 @@ scope {
 	translator.enter_scope($program::global_scope)
 }
 @after {
-	#print '\n\n', ll_scope.LOG_STR
 	$code = translator.program()
 	translator.leave_scope()
 }
@@ -81,8 +80,11 @@ operation
 	:	/*^( WHILE rvalue block_slist) {log(str($slist::local_scope.num) + ' while')}
 	|	^( FOR ID rvalue block_slist ) 
 	|	^( IF rvalue  block_slist elif_operation* else_operation?) 
-	|	^( PRINT rvalue* ) 
-	|*/	^( RETURN rvalue ) {translator.return_operation()} /*
+	|*/	^( PRINT (val=rvalue
+			{translator.print_value($val.type)}
+		)* ) 
+			{translator.print_operation()}
+	|	^( RETURN rvalue ) {translator.return_operation()} /*
 	|	^( GLOBAL ID ) */
 	|	expr
 	;
@@ -197,8 +199,9 @@ identifier
 	
 
 rvalue returns[type]
-	:/*	^( OR_OP rvalue rvalue )
-	|	^( AND_OP rvalue rvalue )
+	:	^( OR_OP val1=rvalue val2=rvalue )
+			{$type = translator.or_expr($val1.type, $val2.type)}
+	|/*	^( AND_OP rvalue rvalue )
 	|	^( EQ_OP rvalue rvalue )
 	|	^( REL_OP rvalue rvalue )
 	|	^( ADD_OP rvalue rvalue )
@@ -209,14 +212,17 @@ rvalue returns[type]
 	|	^( INCR_OP rvalue )
 	|	^( DECR_OP rvalue )
 	|	^( CALL ID rvalue* )
-	|	^( CAST TYPE rvalue )
-	|	^( SLICE ID rvalue rvalue? )
-	|*/	^( LIST_MAKER
+	|*/	^( CAST TYPE val=rvalue ) 
+			{$type = translator.cast_expr($val.type, $TYPE.text)}
+	//|	^( SLICE ID rvalue rvalue? )
+	|	^( LIST_MAKER
 			{translator.list_maker_begin()}
-		(t = rvalue 
-			{translator.list_maker_arg($t.type)} 
+		(val = rvalue 
+			{translator.list_maker_arg($val.type)} 
 		)* ) 
 			{$type = translator.list_maker()}
-	|	INT {$type = translator.element_literal(int($INT.text))}
-	|	ID {$type = translator.var_identifier($ID.text)}
+	|	INT 
+			{$type = translator.element_literal(int($INT.text))}
+	|	ID 
+			{$type = translator.var_identifier($ID.text)}
 	;
