@@ -13,12 +13,12 @@ def log(string):
 
 class Scope:
 
-    count = 0
+    total_scopes_number = 0
 
     def __init__(self):
-        self.num = self.count
-        log('init scope %i' % Scope.count)
-        Scope.count += 1
+        self.scope_number = self.total_scopes_number
+        log('init scope %i' % Scope.total_scopes_number)
+        Scope.total_scopes_number += 1
 
         self.vars = []
         self.var_types = {}      # dict {var_id: var_type}
@@ -33,14 +33,7 @@ class Scope:
         if var_id in self.var_types: log('warning: var replacement "%i"' % var_id)
 
         self.vars.append(var_id)
-
         self.var_types[var_id] = var_type
 
     def get_function_code_name(self, name):
-        return 's%i_%s' % (self.num, name)
-
-
-
-    def __contains__(self, item):
-        return item in [var[0] for var in self.vars] + [func[0] for func in self.funcs]
-
+        return 's%i_%s' % (self.scope_number, name)

@@ -6,14 +6,21 @@ __author__ = 'Oleg Beloglazov'
 ELEMENT = 'Element'
 LIST = 'List'
 
+# JTYPES
+VOID_JTYPE = 'V'
+INTEGER_JTYPE = 'I'
+
+INTEGER_LIST_CLASS = 'listlang/objects/List'
+INTEGER_LIST_JTYPE = 'L%s;' % INTEGER_LIST_CLASS
+
+_type_map = {ELEMENT: INTEGER_JTYPE, LIST: INTEGER_LIST_JTYPE}
+
 
 class SemanticException(Exception): pass
 
 class UndefinedIDException(SemanticException): pass
 class UnsupportedOperation(SemanticException): pass
 
-LIST_CLASS_FULL_NAME = 'listlang/objects/List'
-_type_map = {ELEMENT: 'I', LIST: ('L%s;' % LIST_CLASS_FULL_NAME)}
 
 class JTranslator:
 
@@ -33,6 +40,7 @@ class JTranslator:
         self.scope = self.scopes_stack[-1] if self.scopes_stack else None
 
     def get_rule_position(self):
+        """ Return (line, position_in_line) of begin of current rule """
         symbol = self.walker.input.LT(-1).parent.children[0]
         return symbol.getLine(), symbol.getCharPositionInLine()
 
@@ -62,19 +70,22 @@ class JTranslator:
     # RVALUES (returns value type)
 
     def list_maker_begin(self):
-        self.scope.code_maker.command_new(LIST_CLASS_FULL_NAME)
+        """ Calls first for list_maker rule, before args """
+        self.scope.code_maker.command_new(INTEGER_LIST_CLASS)
         self.scope.code_maker.command_dup()
-        self.scope.code_maker.command_invokespecial(LIST_CLASS_FULL_NAME, '<init>', [], 'V')
+        self.scope.code_maker.command_invokespecial(INTEGER_LIST_CLASS, '<init>', [], VOID_JTYPE)
         self.scope.code_maker.command_dup()  # additional copy for args
 
     def list_maker_arg(self, arg_type):
+        """ Calls for every arg """
         if arg_type != ELEMENT:
-            raise UnsupportedOperation('Make list of lists is unsupported. (%s:%s)' % self.get_rule_position())
+            raise UnsupportedOperation('Making list of lists is unsupported. (%s:%s)' % self.get_rule_position())
 
-        self.scope.code_maker.command_invokevirtual(LIST_CLASS_FULL_NAME, 'addLast', ['I'], 'V')
+        self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'addLast', [INTEGER_JTYPE], VOID_JTYPE)
         self.scope.code_maker.command_dup()
 
     def list_maker(self):
+        """ Calls last for list_maker rule, return type """
         self.scope.code_maker.command_pop()
         return LIST
 
@@ -110,14 +121,9 @@ class JCodeMaker:
 \t%s
 .end method
 
-'''
+'''  # args: name, params, return_jtype, stack_size, locals_number, code
 
-    INVOKE_TEMPLATE = '%s %s/%s(%s)%s' # args: invoke_instruction, full_class_name, method, params, return_type
-
-    # JTYPES
-    VOID = 'V'
-    INTEGER = 'I'
-    INTEGER_LIST = 'Llistlang/objects/List;'
+    INVOKE_TEMPLATE = '%s %s/%s(%s)%s'  # args: invoke_instruction, full_class_name, method, params, return_type
 
 
     def __init__(self):
@@ -126,12 +132,13 @@ class JCodeMaker:
         self.return_added = False
 
     def make_class(self, stack_size, locals_number, methods_code):
+        """ Make Jasmin class with using commands of this maker for main method """
         return (self.CLASS_HEADER +
                 self.make_method('main', ['[Ljava/lang/String;'], stack_size, locals_number) +
                 methods_code)
 
     def make_method(self, name, params, stack_size, locals_number):
-        "returns code of method with code maked by this maker"
+        """ Returns code of method with code maked by this maker """
         if not self.return_added:
             self.command_return()
         code = '\n\t'.join(self.commands)
@@ -140,27 +147,28 @@ class JCodeMaker:
     # COMMANDS
 
     def command_ldc(self, value):
+        """ Jasmin command to load constant on stack """
         command =  'ldc %s' % value
         self.commands.append(command)
 
     def command_store(self, value_jtype, var_number):
         """ Jasmin command to pop from stack var and store it in variable """
-        instruction = 'istore' if value_jtype == self.INTEGER else 'astore'
+        instruction = 'istore' if value_jtype == INTEGER_JTYPE else 'astore'
         command =  '%s %s' % (instruction, var_number)
         self.commands.append(command)
 
     def command_load(self, value_jtype, var_number):
         """ Jasmin command to push variable to stack """
-        instruction =  'iload' if value_jtype == self.INTEGER else 'aload'
+        instruction =  'iload' if value_jtype == INTEGER_JTYPE else 'aload'
         command = '%s %s' % (instruction, var_number)
         self.commands.append(command)
 
 
     def command_return(self):
         """ Jasmin method return command """
-        if self.return_jtype == self.INTEGER:
+        if self.return_jtype == INTEGER_JTYPE:
             instruction = 'ireturn'
-        elif self.return_jtype == self.INTEGER_LIST:
+        elif self.return_jtype == INTEGER_LIST_JTYPE:
             instruction = 'areturn'
         else:
             instruction = 'return'
@@ -169,19 +177,24 @@ class JCodeMaker:
         self.return_added = True
 
     def command_new(self, full_class_name):
+        """ Jasmin command new """
         command = 'new ' + full_class_name
         self.commands.append(command)
 
     def command_dup(self):
+        """ Jasmin command to duplicate top value on stack """
         self.commands.append('dup')
 
     def command_pop(self):
+        """ Jasmin command to pop top value from stack """
         self.commands.append('pop')
 
     def command_invokespecial(self, full_class_name, method, jparams, return_jtype):
+        """ Jasmin command to invoke special methods of objects (constructors, ...) """
         command = self.INVOKE_TEMPLATE % ('invokespecial', full_class_name, method, ''.join(jparams), return_jtype)
         self.commands.append(command)
 
     def command_invokevirtual(self, full_class_name, method, jparams, return_jtype):
+        """ Jasmin command to invoke virtual methods of objects """
         command = self.INVOKE_TEMPLATE % ('invokevirtual', full_class_name, method, ''.join(jparams), return_jtype)
         self.commands.append(command)
