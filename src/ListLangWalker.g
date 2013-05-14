@@ -104,125 +104,46 @@ expr
 
 assignment_expr
 	:	^( ASS_OP ID rvalue ) {translator.assignment_expr($ID.text, $rvalue.type)}
-	;
-/*
-rvalue returns[type]
-	:	or_expr
-	|	and_expr
-	|	equality_expr
-	|	relational_expr
-	|	additive_expr
-	|	multiplicative_expr
-	|	prefix_incr_expr
-	|	prefix_decr_expr
-	|	not_expr
-	|	postfix_incr_expr
-	|	postfix_decr_expr
-	|	call_expr
-	|	cast_expr
-	|	slice_expr
-	|	list_maker
-	|	*element_literal
-	|	identifier
-	;
-	
-
-or_expr
-	:	^( OR_OP rvalue rvalue )
-	;
-	
-and_expr
-	:	^( AND_OP rvalue rvalue )
-	;
-	
-equality_expr
-	:	^( EQ_OP rvalue rvalue )
-	;
-
-relational_expr
-	:	^( REL_OP rvalue rvalue )
-	;
-
-additive_expr
-	:	^( ADD_OP rvalue rvalue )
-	;
-
-multiplicative_expr
-	:	^( MUL_OP rvalue rvalue )
-	;
-
-prefix_incr_expr
-	:	^( PRE_INCR rvalue )
-	;
-	
-prefix_decr_expr
-	:	^( PRE_DECR rvalue )
-	;
-	
-not_expr
-	:	^( NOT_OP rvalue )
-	;
-
-postfix_incr_expr
-	:	^( INCR_OP rvalue )
-	;
-	
-postfix_decr_expr
-	:	^( DECR_OP rvalue )
-	;
-
-call_expr
-	:	^( CALL ID rvalue* )
-	;
-
-cast_expr
-	:	^( CAST TYPE rvalue )
-	;
-
-slice_expr
-	:	^( SLICE ID rvalue rvalue? )
-	;
-
-list_maker
-	:	^( LIST_MAKER rvalue* ) 
-	;
-
-
-element_literal returns[type]
-	:	INT {$type = translator.element_literal(int($INT.text))}
-	;
-
-identifier
-	:	ID {$type = translator.var_identifier($ID.text)}
-	;
-*/
-	
+	;	
 
 rvalue returns[type]
 	:	^( OR_OP val1=rvalue val2=rvalue )
 			{$type = translator.or_expr($val1.type, $val2.type)}
-	|/*	^( AND_OP rvalue rvalue )
-	|	^( EQ_OP rvalue rvalue )
-	|	^( REL_OP rvalue rvalue )
-	|	^( ADD_OP rvalue rvalue )
-	|	^( MUL_OP rvalue rvalue )
-	|	^( PRE_INCR rvalue )
+			
+	|	^( AND_OP val1=rvalue val2=rvalue )
+			{$type = translator.and_expr($val1.type, $val2.type)}
+			
+	|	^( EQ_OP val1=rvalue val2=rvalue )
+			{$type = translator.equality_expr($EQ_OP.text, $val1.type, $val2.type)}
+			
+	|	^( REL_OP val1=rvalue val2=rvalue )
+			{$type = translator.relational_expr($REL_OP.text, $val1.type, $val2.type)}
+	
+	|	^( ADD_OP val1=rvalue val2=rvalue )
+			{$type = translator.additive_expr($ADD_OP.text, $val1.type, $val2.type)}
+			
+	|	^( MUL_OP val1=rvalue val2=rvalue )
+			{$type = translator.multiplicative_expr($MUL_OP.text, $val1.type, $val2.type)}
+	|/*	^( PRE_INCR rvalue )
 	|	^( PRE_DECR rvalue )
-	|	^( NOT_OP rvalue )
-	|	^( INCR_OP rvalue )
+	
+	|*/	^( NOT_OP val=rvalue )		{$type = translator.not_expr($val.type)}
+	
+	|/*	^( INCR_OP rvalue )
+	
 	|	^( DECR_OP rvalue )
+	
 	|	^( CALL ID rvalue* )
-	|*/	^( CAST TYPE val=rvalue ) 
-			{$type = translator.cast_expr($val.type, $TYPE.text)}
+	
+	|*/	^( CAST TYPE val=rvalue ) 	{$type = translator.cast_expr($val.type, $TYPE.text)}
+	
 	//|	^( SLICE ID rvalue rvalue? )
-	|	^( LIST_MAKER
-			{translator.list_maker_begin()}
-		(val = rvalue 
-			{translator.list_maker_arg($val.type)} 
-		)* ) 
-			{$type = translator.list_maker()}
-	|	INT 
-			{$type = translator.element_literal(int($INT.text))}
-	|	ID 
-			{$type = translator.var_identifier($ID.text)}
+	
+	|	^( LIST_MAKER			{translator.list_maker_begin()}
+		(val = rvalue 			{translator.list_maker_arg($val.type)} 
+		)* )				{$type = translator.list_maker()}
+		
+	|	INT 				{$type = translator.element_literal(int($INT.text))}
+	
+	|	ID 				{$type = translator.var_identifier($ID.text)}
 	;

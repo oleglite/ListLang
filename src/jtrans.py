@@ -19,7 +19,9 @@ _type_map = {ELEMENT: INTEGER_JTYPE, LIST: INTEGER_LIST_JTYPE}
 RESERVED_LOCALS = 10
 
 
-class SemanticException(Exception): pass
+class SemanticException(Exception):
+    def __init__(self, line, pos_in_line, message):
+        Exception.__init__(self, '%i:%i %s' % (line, pos_in_line, message))
 
 class UndefinedIDException(SemanticException): pass
 class UnsupportedOperation(SemanticException): pass
@@ -44,14 +46,17 @@ class JTranslator:
 
     def get_rule_position(self):
         """ Return (line, position_in_line) of begin of current rule """
-        symbol = self.walker.input.LT(-1).parent.children[0]
+        symbol = self.walker.input.LT(-1)
+        if symbol.parent:
+            symbol = symbol.parent.children[0]
         return symbol.getLine(), symbol.getCharPositionInLine()
 
     def get_var_number(self, var_id):
         try:
             var_number = self.scope.vars.index(var_id)
         except ValueError:
-            raise UndefinedIDException('Undefined ID "%s" at (%s:%s)' % ((var_id,) + self.get_rule_position()))
+            line, pos = self.get_rule_position()
+            raise UnsupportedOperation(line, pos, 'Undefined ID "%s".' % var_id)
         return RESERVED_LOCALS + var_number
 
     # RULES
@@ -105,8 +110,8 @@ class JTranslator:
         or_end_label = self.scope.code_maker.make_label('OR_END')
 
         self.scope.code_maker.command_swap()
-        self.scope.code_maker.command_ifgt(true1_label)
-        self.scope.code_maker.command_ifgt(true2_label)
+        self.scope.code_maker.command_ifne(true1_label)
+        self.scope.code_maker.command_ifne(true2_label)
         self.scope.code_maker.command_ldc(0)
         self.scope.code_maker.command_goto(or_end_label)
         self.scope.code_maker.command_label(true1_label)
@@ -116,6 +121,168 @@ class JTranslator:
         self.scope.code_maker.command_label(or_end_label)
 
         return ELEMENT
+
+    def and_expr(self, type1, type2):
+        if type2 == LIST:
+            self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'to_int', [], INTEGER_JTYPE)
+        if type1 == LIST:
+            self.scope.code_maker.command_swap()
+            self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'to_int', [], INTEGER_JTYPE)
+            self.scope.code_maker.command_swap()
+
+        false1_label = self.scope.code_maker.make_label('AND_FALSE1')
+        false2_label = self.scope.code_maker.make_label('AND_FALSE')
+        and_end_label = self.scope.code_maker.make_label('AND_END')
+
+        self.scope.code_maker.command_swap()
+        self.scope.code_maker.command_ifeq(false1_label)
+        self.scope.code_maker.command_ifeq(false2_label)
+        self.scope.code_maker.command_ldc(1)
+        self.scope.code_maker.command_goto(and_end_label)
+        self.scope.code_maker.command_label(false1_label)
+        self.scope.code_maker.command_pop()
+        self.scope.code_maker.command_label(false2_label)
+        self.scope.code_maker.command_ldc(0)
+        self.scope.code_maker.command_label(and_end_label)
+
+        return ELEMENT
+
+    def equality_expr(self, operator, type1, type2):
+        if type1 == type2 == ELEMENT:
+            eq_true_label = self.scope.code_maker.make_label('EQ_TRUE')
+            eq_end_label = self.scope.code_maker.make_label('EQ_END')
+
+            self.scope.code_maker.command_if_icmpeq(eq_true_label)
+            self.scope.code_maker.command_ldc(0)
+            self.scope.code_maker.command_goto(eq_end_label)
+            self.scope.code_maker.command_label(eq_true_label)
+            self.scope.code_maker.command_ldc(1)
+            self.scope.code_maker.command_label(eq_end_label)
+
+        elif type1 == type2 == LIST:
+            self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'equal', [INTEGER_LIST_JTYPE], INTEGER_JTYPE)
+
+        else:
+            self.scope.code_maker.command_pop()
+            self.scope.code_maker.command_pop()
+            self.scope.code_maker.command_ldc(0)
+
+        if operator == '!=':
+            self.not_expr(ELEMENT)
+
+        return ELEMENT
+
+    def relational_expr(self, operator, type1, type2):
+        if type1 == LIST or type2 == LIST:
+            line, pos = self.get_rule_position()
+            raise UnsupportedOperation(line, pos, 'Relational operation (%s) for lists is unsupported.' % operator)
+
+        rel_true_label = self.scope.code_maker.make_label('REL_TRUE')
+        rel_end_label = self.scope.code_maker.make_label('REL_END')
+
+        if operator == '<': self.scope.code_maker.command_if_icmplt(rel_true_label)
+        elif operator == '<=': self.scope.code_maker.command_if_icmple(rel_true_label)
+        elif operator == '>': self.scope.code_maker.command_if_icmpgt(rel_true_label)
+        elif operator == '>=': self.scope.code_maker.command_if_icmpge(rel_true_label)
+
+        self.scope.code_maker.command_ldc(0)
+        self.scope.code_maker.command_goto(rel_end_label)
+        self.scope.code_maker.command_label(rel_true_label)
+        self.scope.code_maker.command_ldc(1)
+        self.scope.code_maker.command_label(rel_end_label)
+
+        return ELEMENT
+
+    def additive_expr(self, operator, type1, type2):
+        if operator == '+':
+            if type1 == type2 == ELEMENT:
+                self.scope.code_maker.command_iadd()
+                return ELEMENT
+            elif type1 == type2 == LIST:
+                self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'concat', [INTEGER_LIST_JTYPE], INTEGER_LIST_JTYPE)
+                return LIST
+            elif type1 == ELEMENT and type2 == LIST:
+                self.scope.code_maker.command_dup()
+                self.scope.code_maker.command_store(INTEGER_LIST_JTYPE, 0)
+                self.scope.code_maker.command_swap()
+                self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'addFirst', [INTEGER_JTYPE], VOID_JTYPE)
+                self.scope.code_maker.command_load(INTEGER_LIST_JTYPE, 0)
+                return LIST
+            elif type1 == LIST and  type2 == ELEMENT:
+                self.scope.code_maker.command_swap()
+                self.scope.code_maker.command_dup()
+                self.scope.code_maker.command_store(INTEGER_LIST_JTYPE, 0)
+                self.scope.code_maker.command_swap()
+                self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'addLast', [INTEGER_JTYPE], VOID_JTYPE)
+                self.scope.code_maker.command_load(INTEGER_LIST_JTYPE, 0)
+                return LIST
+        elif operator == '-':
+            if type1 == type2 == ELEMENT:
+                self.scope.code_maker.command_isub()
+                return ELEMENT
+            else:
+                line, pos = self.get_rule_position()
+                raise UnsupportedOperation(line, pos,
+                                           'Additive expression (%s %s %s) is unsupported.' % (type1, operator, type2))
+
+    def multiplicative_expr(self, operator, type1, type2):
+        if operator == '*':
+            if type1 == type2 == ELEMENT:
+                self.scope.code_maker.command_imul()
+                return ELEMENT
+            elif type1 == LIST and type2 == ELEMENT:
+                self.scope.code_maker.command_invokevirtual(
+                    INTEGER_LIST_CLASS, 'multiply', [INTEGER_JTYPE], INTEGER_LIST_JTYPE
+                )
+                return LIST
+            
+        elif operator == '/':
+            if type1 == type2 == ELEMENT:
+                self.scope.code_maker.command_idiv()
+                return ELEMENT
+            elif type1 == LIST and type2 == ELEMENT:
+                self.scope.code_maker.command_invokevirtual(
+                    INTEGER_LIST_CLASS, 'removeEvery', [INTEGER_JTYPE], INTEGER_LIST_JTYPE
+                )
+                return LIST
+
+        elif operator == '%':
+            if type1 == type2 == ELEMENT:
+                self.scope.code_maker.command_irem()
+                return ELEMENT
+            elif type1 == LIST and type2 == ELEMENT:
+                self.scope.code_maker.command_swap()
+                self.scope.code_maker.command_dup()
+                self.scope.code_maker.command_store(INTEGER_LIST_JTYPE, 0)
+                self.scope.code_maker.command_swap()
+                self.scope.code_maker.command_invokevirtual(
+                    INTEGER_LIST_CLASS, 'del', [INTEGER_JTYPE], VOID_JTYPE
+                )
+                self.scope.code_maker.command_load(INTEGER_LIST_JTYPE, 0)
+                return LIST
+
+        line, pos = self.get_rule_position()
+        raise UnsupportedOperation(line, pos,
+                                   'Multiplicative expression (%s %s %s) is unsupported.' % (type1, operator, type2))
+
+
+    def not_expr(self, value_type):
+        if value_type == LIST:
+            self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'to_int', [], INTEGER_JTYPE)
+
+        false_label = self.scope.code_maker.make_label('BOOL_FALSE')
+        end_label = self.scope.code_maker.make_label('BOOL_END')
+
+        self.scope.code_maker.command_ifeq(false_label)
+        self.scope.code_maker.command_ldc(0)
+        self.scope.code_maker.command_goto(end_label)
+        self.scope.code_maker.command_label(false_label)
+        self.scope.code_maker.command_ldc(1)
+        self.scope.code_maker.command_label(end_label)
+
+        return ELEMENT
+
+
 
 
     def cast_expr(self, value_type, target_type):
@@ -149,7 +316,8 @@ class JTranslator:
     def list_maker_arg(self, arg_type):
         """ Calls for every arg """
         if arg_type != ELEMENT:
-            raise UnsupportedOperation('Making list of lists is unsupported. (%s:%s)' % self.get_rule_position())
+            line, pos = self.get_rule_position()
+            raise UnsupportedOperation(line, pos, 'Making list of lists is unsupported.')
 
         self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'addLast', [INTEGER_JTYPE], VOID_JTYPE)
         self.scope.code_maker.command_dup()
@@ -243,7 +411,7 @@ class JCodeMaker:
             self.command_load(param_jtype, i, add_first=True)
 
         code = '\n\t'.join(self.commands)
-        return self.JMETHOD_TEMPLATE % (name, ''.join(params_jtypes), self.return_jtype, stack_size, locals_number, code)
+        return self.JMETHOD_TEMPLATE % (name, ''.join(params_jtypes), self.return_jtype, stack_size, locals_number+1, code)
 
     def make_label(self, name):
         self.label_counter += 1
@@ -321,11 +489,49 @@ class JCodeMaker:
     def command_ifgt(self, label):
         self.add_command('ifgt ' + label)
 
+    def command_ifne(self, label):
+        self.add_command('ifne ' + label)
+
     def command_ifeq(self, label):
         self.add_command('ifeq ' + label)
 
     def command_goto(self, label):
         self.add_command('goto ' + label)
 
+    def command_if_icmpeq(self, label):
+        self.add_command('if_icmpeq ' + label)
+
+    def command_if_icmplt(self, label):
+        self.add_command('if_icmplt ' + label)
+
+    def command_if_icmpge(self, label):
+        self.add_command('if_icmpge ' + label)
+
+    def command_if_icmpgt(self, label):
+        self.add_command('if_icmpgt ' + label)
+
+    def command_if_icmple(self, label):
+        self.add_command('if_icmple ' + label)
+
     def command_label(self, label):
         self.add_command('\t%s:' % label)
+
+    def command_iadd(self):
+        self.add_command('iadd')
+
+    def command_isub(self):
+        self.add_command('isub')
+
+    def command_imul(self):
+        self.add_command('imul')
+
+    def command_idiv(self):
+        self.add_command('idiv')
+
+    def command_irem(self):
+        self.add_command('irem')
+
+    def command_ineg(self):
+        self.add_command('ineg')
+
+

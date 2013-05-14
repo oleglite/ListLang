@@ -71,12 +71,33 @@ public class List {
 		}
 	}
 	
-	public List add(List second) {
+	public List concat(List second) {
 		List resList = this.clone();
 		for(int i = 0; i < second.len(); i++) {
 			resList.addLast(second.get(i));
 		}
 		return resList;
+	}
+	
+	public List multiply(int times) {
+		List result = this;
+		for(int i = 1; i < times; i++) {
+			result = result.concat(this);
+		}
+		return result;
+	}
+	
+	public List removeEvery(int n) {
+		List result = clone();
+		int i = 0;
+		while(i < result.len()) {
+			if(result.get(i) == n) {
+				result.del(i);
+			} else {
+				i++;
+			}
+		}
+		return result;
 	}
 
 	public List pre_incr() {
