@@ -21,7 +21,12 @@ RESERVED_LOCALS = 10
 
 class SemanticException(Exception):
     def __init__(self, line, pos_in_line, message):
-        Exception.__init__(self, '%i:%i %s' % (line, pos_in_line, message))
+        self.line = line
+        self.pos_in_line = pos_in_line
+        self.message = message
+        
+    def __str__(self):
+        return '%i:%i %s' % (self.line, self.pos_in_line, self.message)
 
 class UndefinedIDException(SemanticException): pass
 class UnsupportedOperation(SemanticException): pass
@@ -235,7 +240,7 @@ class JTranslator:
                     INTEGER_LIST_CLASS, 'multiply', [INTEGER_JTYPE], INTEGER_LIST_JTYPE
                 )
                 return LIST
-            
+
         elif operator == '/':
             if type1 == type2 == ELEMENT:
                 self.scope.code_maker.command_idiv()
@@ -264,7 +269,53 @@ class JTranslator:
         line, pos = self.get_rule_position()
         raise UnsupportedOperation(line, pos,
                                    'Multiplicative expression (%s %s %s) is unsupported.' % (type1, operator, type2))
-
+                                   
+    def pre_incr_expr(self, value_type):
+        if value_type == ELEMENT:
+            self.scope.code_maker.command_ldc(1)
+            self.scope.code_maker.command_iadd()
+            return ELEMENT
+        elif value_type == LIST:
+            self.scope.code_maker.command_dup()
+            self.scope.code_maker.command_ldc(0)
+            self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'addFirst', [INTEGER_JTYPE], VOID_JTYPE)
+            return LIST
+            
+    def pre_decr_expr(self, value_type):
+        if value_type == ELEMENT:
+            self.scope.code_maker.command_ldc(1)
+            self.scope.code_maker.command_isub()
+            return ELEMENT
+        elif value_type == LIST:
+            self.scope.code_maker.command_dup()
+            self.scope.code_maker.command_ldc(0)
+            self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'del', [INTEGER_JTYPE], VOID_JTYPE)
+            return LIST
+            
+    def post_incr_expr(self, value_type):
+        if value_type == ELEMENT:
+            self.scope.code_maker.command_ldc(1)
+            self.scope.code_maker.command_iadd()
+            return ELEMENT
+        elif value_type == LIST:
+            self.scope.code_maker.command_dup()
+            self.scope.code_maker.command_ldc(0)
+            self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'addLast', [INTEGER_JTYPE], VOID_JTYPE)
+            return LIST
+            
+    def post_decr_expr(self, value_type):
+        if value_type == ELEMENT:
+            self.scope.code_maker.command_ldc(1)
+            self.scope.code_maker.command_isub()
+            return ELEMENT
+        elif value_type == LIST:
+            self.scope.code_maker.command_dup()
+            self.scope.code_maker.command_dup()
+            self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'len', [], INTEGER_JTYPE)
+            self.scope.code_maker.command_ldc(1)
+            self.scope.code_maker.command_isub()
+            self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'del', [INTEGER_JTYPE], VOID_JTYPE)
+            return LIST
 
     def not_expr(self, value_type):
         if value_type == LIST:

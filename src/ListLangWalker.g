@@ -124,16 +124,22 @@ rvalue returns[type]
 			
 	|	^( MUL_OP val1=rvalue val2=rvalue )
 			{$type = translator.multiplicative_expr($MUL_OP.text, $val1.type, $val2.type)}
-	|/*	^( PRE_INCR rvalue )
-	|	^( PRE_DECR rvalue )
+			
+	|	^( PRE_INCR val=rvalue )
+			{$type = translator.pre_incr_expr($val.type)}
+			
+	|	^( PRE_DECR val=rvalue )
+			{$type = translator.pre_decr_expr($val.type)}
 	
-	|*/	^( NOT_OP val=rvalue )		{$type = translator.not_expr($val.type)}
+	|	^( NOT_OP val=rvalue )		{$type = translator.not_expr($val.type)}
 	
-	|/*	^( INCR_OP rvalue )
+	|	^( INCR_OP val=rvalue )
+			{$type = translator.post_incr_expr($val.type)}
 	
-	|	^( DECR_OP rvalue )
+	|	^( DECR_OP val=rvalue )
+			{$type = translator.post_decr_expr($val.type)}
 	
-	|	^( CALL ID rvalue* )
+	|/*	^( CALL ID rvalue* )
 	
 	|*/	^( CAST TYPE val=rvalue ) 	{$type = translator.cast_expr($val.type, $TYPE.text)}
 	

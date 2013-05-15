@@ -11,6 +11,8 @@ import antlr3
 import antlr3.tree
 from antlr3.dottreegen import DOTTreeGenerator
 
+import jtrans
+
 from ListLangLexer import ListLangLexer
 from ListLangParser import ListLangParser
 from ListLangWalker import ListLangWalker
@@ -67,21 +69,21 @@ def main():
 
     nodes = antlr3.tree.CommonTreeNodeStream(ast)
     nodes.setTokenStream(tokens)
+    
     walker = ListLangWalker(nodes)
     '''
     if parser.errors > 0:
         print 'Total: %d errors' % parser.errors
         sys.exit(1)
     '''
-    #try:
-    target_file = open(args.dest_filename, 'w')
-    target_code = walker.program()
-    if target_code:
-        target_file.write(target_code)
-        print 'target generated'
-# except Exception as e:
-    #     print 'Exception', type(e)
-    #     sys.exit(0)
+    try:
+        target_file = open(args.dest_filename, 'w')
+        target_code = walker.program()
+        if target_code:
+            target_file.write(target_code)
+    except jtrans.SemanticException as e:
+            print 'Exception', str(e)
+            sys.exit(1)
 
 
 
