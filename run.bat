@@ -1,11 +1,11 @@
 @ECHO OFF
 
 SET JASMIN_JAR_FILE=tmp\jasmin.jar
+SET PYTHON_HOME=
 
-
-python src\listlang.py %1 tmp\target.j
+CALL "%PYTHON_HOME%python.exe" src\listlang.py %1 tmp\target.j
 IF ERRORLEVEL 1 GOTO EXIT
-java -jar %JASMIN_JAR_FILE% -d tmp\ tmp\target.j
+@java -jar %JASMIN_JAR_FILE% -d tmp\ tmp\target.j
 IF ERRORLEVEL 1 GOTO EXIT
 java -cp tmp\ LLMain
 IF ERRORLEVEL 1 GOTO EXIT
