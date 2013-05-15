@@ -139,9 +139,14 @@ rvalue returns[type]
 	|	^( DECR_OP val=rvalue )
 			{$type = translator.post_decr_expr($val.type)}
 	
-	|/*	^( CALL ID rvalue* )
+	|	^( CALL
+			{types = []}
+		 ID (val=rvalue
+		 	{types.append($val.type)}
+		 )* )
+			{$type = translator.call_expr($ID.text, types)}
 	
-	|*/	^( CAST TYPE val=rvalue ) 	{$type = translator.cast_expr($val.type, $TYPE.text)}
+	|	^( CAST TYPE val=rvalue ) 	{$type = translator.cast_expr($val.type, $TYPE.text)}
 	
 	//|	^( SLICE ID rvalue rvalue? )
 	

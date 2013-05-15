@@ -22,12 +22,13 @@ class Scope:
 
         self.vars = []
         self.var_types = {}      # dict {var_id: var_type}
-        self.funcs = []     # list of tuples (function_id, function_type, function_params_types, function_scope, ...)
+        self.funcs = {}     # {function_id: (function_type, function_params_types, function_scope, ...)}
         self.code_maker = jtrans.JCodeMaker()
 
     def add_function(self, f_id, f_type, f_params, f_scope):
         log('%i function' % f_scope.scope_number)
-        self.funcs.append((f_id, f_type, f_params, f_scope))
+        f_params_types = [param[1] for param in f_params]
+        self.funcs[f_id] = (f_type, f_params_types, f_scope)
 
     def add_var(self, var_id, var_type):
         if var_id in self.var_types: log('warning: var replacement "%i"' % var_id)

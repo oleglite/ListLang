@@ -30,6 +30,7 @@ class SemanticException(Exception):
 
 class UndefinedIDException(SemanticException): pass
 class UnsupportedOperation(SemanticException): pass
+class FunctionUnfoundException(SemanticException): pass
 
 
 class JTranslator:
@@ -333,6 +334,22 @@ class JTranslator:
 
         return ELEMENT
 
+    def call_expr(self, func_id, types):
+        func_description = self.scope.funcs.get(func_id)
+
+        if func_description and func_description[1] == types:
+            func_type = func_description[0]
+            jmethod_id = self.scope.get_function_code_name(func_id)
+            f_translated_params = [_type_map[type] for type in types]
+            self.scope.code_maker.command_invokestatic(
+                JCodeMaker.CLASS_NAME, jmethod_id, f_translated_params, _type_map[func_type]
+            )
+            return func_type  # function return type
+        else:
+            line, pos = self.get_rule_position()
+            raise FunctionUnfoundException(
+                line, pos, "Can't found function with sugnature %s(%s)." % (func_id, ', '.join(types))
+            )
 
 
 
