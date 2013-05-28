@@ -41,6 +41,14 @@ public class List {
 		mList.addLast(new Integer(n));
 	}
 	
+	public void removeFirst() {
+		mList.remove(0);
+	}
+	
+	public void removeLast() {
+		mList.remove(mList.size() - 1);
+	}
+	
 	public void del(int i) {
 		mList.remove(i);
 	}

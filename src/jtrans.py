@@ -188,7 +188,6 @@ class JTranslator:
     def global_operation(self, var_id):
         self.scope.add_global_var(var_id)
 
-    # TODO: создаются дубликаты полей если присваивать в глобальной области видимости
     def assignment_expr(self, var_id, value_type):
         if self.scope.is_global():
             field_name = self.scope.code_maker.make_field_name(var_id)
@@ -387,58 +386,56 @@ class JTranslator:
                 return LIST
 
         line, pos = self.get_rule_position()
-        raise error_processor.UnsupportedOperation(line, pos,
-                                   'Multiplicative expression (%s %s %s) is unsupported.' % (type1, operator, type2))
+        raise error_processor.UnsupportedOperation(
+            line, pos, 'Multiplicative expression (%s %s %s) is unsupported.' % (type1, operator, type2)
+        )
                                    
     def pre_incr_expr(self, value_type):
         self.scope.code_maker.command_comment('pre_incr_expr ++%s' % value_type)
-        if value_type == ELEMENT:
-            self.scope.code_maker.command_ldc(1)
-            self.scope.code_maker.command_iadd()
-            return ELEMENT
-        elif value_type == LIST:
+        if value_type == LIST:
             self.scope.code_maker.command_dup()
             self.scope.code_maker.command_ldc(0)
             self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'addFirst', [INTEGER_JTYPE], VOID_JTYPE)
             return LIST
+        else:
+            line, pos = self.get_rule_position()
+            raise error_processor.UnsupportedOperation(
+                line, pos, 'Prefix increment operation for type "%s" is unsupported.' % (value_type)
+            )
             
     def pre_decr_expr(self, value_type):
         self.scope.code_maker.command_comment('pre_decr_expr --%s' % value_type)
-        if value_type == ELEMENT:
-            self.scope.code_maker.command_ldc(1)
-            self.scope.code_maker.command_isub()
-            return ELEMENT
-        elif value_type == LIST:
+        if value_type == LIST:
             self.scope.code_maker.command_dup()
-            self.scope.code_maker.command_ldc(0)
-            self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'del', [INTEGER_JTYPE], VOID_JTYPE)
+            self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'removeFirst', [], VOID_JTYPE)
             return LIST
+        line, pos = self.get_rule_position()
+        raise error_processor.UnsupportedOperation(
+            line, pos, 'Prefix decrement operation for type "%s" is unsupported.' % (value_type)
+        )
             
     def post_incr_expr(self, value_type):
         self.scope.code_maker.command_comment('post_incr_expr %s++' % value_type)
-        if value_type == ELEMENT:
-            self.scope.code_maker.command_ldc(1)
-            self.scope.code_maker.command_iadd()
-            return ELEMENT
-        elif value_type == LIST:
+        if value_type == LIST:
             self.scope.code_maker.command_dup()
             self.scope.code_maker.command_ldc(0)
             self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'addLast', [INTEGER_JTYPE], VOID_JTYPE)
             return LIST
+        line, pos = self.get_rule_position()
+        raise error_processor.UnsupportedOperation(
+            line, pos, 'Postfix increment operation for type "%s" is unsupported.' % (value_type)
+        )
             
     def post_decr_expr(self, value_type):
         self.scope.code_maker.command_comment('post_decr_expr %s--' % value_type)
-        if value_type == ELEMENT:
-            self.scope.code_maker.command_ldc(1)
-            self.scope.code_maker.command_isub()
-            return ELEMENT
-        elif value_type == LIST:
+        if value_type == LIST:
             self.scope.code_maker.command_dup()
-            self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'len', [], INTEGER_JTYPE)
-            self.scope.code_maker.command_ldc(1)
-            self.scope.code_maker.command_isub()
-            self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'del', [INTEGER_JTYPE], VOID_JTYPE)
+            self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'removeLast', [], VOID_JTYPE)
             return LIST
+        line, pos = self.get_rule_position()
+        raise error_processor.UnsupportedOperation(
+            line, pos, 'Postfix decrement operation for type "%s" is unsupported.' % (value_type)
+        )
 
     def not_expr(self, value_type):
         self.scope.code_maker.command_comment('not_expr not %s' % value_type)
