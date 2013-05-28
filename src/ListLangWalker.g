@@ -52,7 +52,7 @@ scope {
 }
 @init {
 	$function::params = []
-	$function::function_scope = Scope()
+	$function::function_scope = Scope($program::global_scope)
 	translator.enter_scope($function::function_scope)
 }
 	:	^( FUNCTION TYPE ID param* 
@@ -77,25 +77,50 @@ block_slist
 	;
 
 operation
-	:	/*^( WHILE rvalue block_slist) {log(str($slist::local_scope.num) + ' while')}
-	|	^( FOR ID rvalue block_slist ) 
-	|	^( IF rvalue  block_slist elif_operation* else_operation?) 
-	|*/	^( PRINT (val=rvalue
+	:	^( WHILE 
+			{translator.while_operation_begin()}
+		val=rvalue 
+			{translator.while_operation_value($val.type)}
+		block_slist)
+			{translator.while_operation()}
+			
+	|	^( FOR ID val=rvalue
+			{translator.for_operation_begin($ID.text, $val.type)}
+		block_slist 
+			{translator.for_operation()}
+		)
+	|	^( IF val=rvalue 
+			{translator.if_operation_value($val.type)}
+		block_slist
+			{translator.if_operation_else()}
+		elif_operation* else_operation? 
+			{translator.if_operation()} 
+		) 
+			
+		
+	|	^( PRINT (val=rvalue
 			{translator.print_value($val.type)}
 		)* ) 
 			{translator.print_operation()}
-	|	^( RETURN rvalue ) {translator.return_operation()} /*
-	|	^( GLOBAL ID ) */
+	|	^( RETURN rvalue ) 
+			{translator.return_operation()}
+			
+	|	^( GLOBAL ID )
+			{translator.global_operation($ID.text)}
 	|	expr
 	;
-/*
+
 elif_operation
-	:	^( ELIF rvalue block_slist )
+	:	^( ELIF val=rvalue
+			{translator.if_operation_value($val.type, is_elif=True)}
+		block_slist 
+			{translator.if_operation_else()}
+		)
 	;
 
 else_operation
 	:	^( ELSE block_slist )
-	;*/
+	;
 
 expr
 	:	assignment_expr
@@ -146,9 +171,11 @@ rvalue returns[type]
 		 )* )
 			{$type = translator.call_expr($ID.text, types)}
 	
-	|	^( CAST TYPE val=rvalue ) 	{$type = translator.cast_expr($val.type, $TYPE.text)}
+	|	^( CAST TYPE val=rvalue ) 
+			{$type = translator.cast_expr($val.type, $TYPE.text)}
 	
-	//|	^( SLICE ID rvalue rvalue? )
+	|	^( L_SQUARE_BRACKET list_val=rvalue val1=rvalue val2=rvalue? )
+			{$type = translator.slice_expr($list_val.type, $val1.type, $val2.type)}
 	
 	|	^( LIST_MAKER			{translator.list_maker_begin()}
 		(val = rvalue 			{translator.list_maker_arg($val.type)} 

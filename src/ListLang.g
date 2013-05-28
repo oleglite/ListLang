@@ -19,16 +19,30 @@ tokens {
 
 @header {
 	import antlr3
+	import error_processor
 }
 
 @members {
-	errors = 0
 	
-	def emitErrorMessage(self, msg):
-		self.errors += 1
-		sys.stderr.write(msg + '\n')
+	def lexerReportError(self, e):
+		line = e.line
+		position_in_line = e.charPositionInLine
+		msg = self.getErrorMessage(e, self.tokenNames)
+		error_processor.add_error(error_processor.LEXICAL, line, position_in_line, msg)
+		
+		antlr3.BaseRecognizer.reportError(self, e)
+
+	def parserReportError(self, e):
+		line = e.line
+		position_in_line = e.charPositionInLine
+		msg = self.getErrorMessage(e, self.tokenNames)
+		error_processor.add_error(error_processor.SYNTAX, line, position_in_line, msg)
+		
+		antlr3.BaseRecognizer.reportError(self, e)
 	
-	#antlr3.BaseRecognizer.emitErrorMessage = emitErrorMessage
+	antlr3.Lexer.reportError = lexerReportError
+	antlr3.Parser.reportError = parserReportError
+	antlr3.BaseRecognizer.emitErrorMessage = lambda self, msg: None
 }
 
 program
@@ -66,7 +80,7 @@ operation
 
 print_operation
 	:	PRINT^ args_list
-	;
+		;
 
 return_operation
 	:	RETURN^ rvalue
@@ -149,13 +163,16 @@ unary_expr
 	;
 
 postfix_expr
-	:	primary_expr ( ( INCR_OP | DECR_OP )^ )*
+	:	slice_expr ( ( INCR_OP | DECR_OP )^ )*
+	;
+	
+slice_expr
+	:	primary_expr ( L_SQUARE_BRACKET^ primary_expr ( COLON! primary_expr? )? R_SQUARE_BRACKET! )?
 	;
 
 primary_expr
 	:	call_expr
 	|	cast_expr
-	|	slice_expr
 	|	element_literal
 	|	list_maker
 	|	L_BRACKET rvalue R_BRACKET -> rvalue
@@ -172,10 +189,6 @@ cast_expr
 
 args_list
 	:	( rvalue ( COMMA rvalue )* )? -> rvalue*
-	;
-
-slice_expr
-	:	ID L_SQUARE_BRACKET rvalue ( COLON rvalue? )? R_SQUARE_BRACKET -> ^( SLICE ID rvalue rvalue? )
 	;
 
 element_literal

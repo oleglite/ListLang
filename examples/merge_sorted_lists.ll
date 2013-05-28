@@ -17,6 +17,8 @@ List mergeSortedLists(List l1, List l2) {
 			}
 		}
 	}
+	
+	return result
 }
 
 list1 = [1, 3, 6, 8]

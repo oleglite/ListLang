@@ -20,13 +20,13 @@ public class List {
 		System.out.print("[" + str + "]");
 	}
 	
-	public List clone() {
-		return new List(this.getLinkedList());
-	}
-	
 	@SuppressWarnings("unchecked")
 	public List(LinkedList<Integer> linkedList) {
 		mList = (LinkedList<Integer>) linkedList.clone();
+	}
+	
+	public List clone() {
+		return new List(this.getLinkedList());
 	}
 	
 	public LinkedList<Integer> getLinkedList() {
@@ -57,6 +57,17 @@ public class List {
 	
 	public int get(int i) {
 		return mList.get(i).intValue();
+	}
+	
+	public List slice(int begin, int end) {
+		LinkedList<Integer> slicingLinkedList = this.getLinkedList();
+		for(int i = slicingLinkedList.size() - end; i > 0; i--) {
+			slicingLinkedList.remove(end);
+		}
+		for(int i = 0; i < begin; i++) {
+			slicingLinkedList.remove(0);
+		}
+		return new List(slicingLinkedList);
 	}
 	
 	public int len() {

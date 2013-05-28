@@ -15,7 +15,9 @@ class Scope:
 
     total_scopes_number = 0
 
-    def __init__(self):
+    def __init__(self, global_scope=None):
+        """ global_scope - scope that global for this scope, None if this scope is global """
+
         self.scope_number = self.total_scopes_number
         log('init scope %i' % Scope.total_scopes_number)
         Scope.total_scopes_number += 1
@@ -24,6 +26,15 @@ class Scope:
         self.var_types = {}      # dict {var_id: var_type}
         self.funcs = {}     # {function_id: (function_type, function_params_types, function_scope, ...)}
         self.code_maker = jtrans.JCodeMaker()
+        if global_scope:
+            self.global_scope = global_scope
+            self.global_vars = []
+        else:
+            self.global_scope = self
+            self.global_vars = None
+
+    def is_global(self):
+        return self.global_scope is self
 
     def add_function(self, f_id, f_type, f_params, f_scope):
         log('%i function' % f_scope.scope_number)
@@ -31,10 +42,11 @@ class Scope:
         self.funcs[f_id] = (f_type, f_params_types, f_scope)
 
     def add_var(self, var_id, var_type):
-        if var_id in self.var_types: log('warning: var replacement "%i"' % var_id)
-
         self.vars.append(var_id)
         self.var_types[var_id] = var_type
+
+    def add_global_var(self, var_id):
+        self.global_vars.append(var_id)
 
     def get_function_code_name(self, name):
         return 's%i_%s' % (self.scope_number, name)
