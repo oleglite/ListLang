@@ -583,6 +583,7 @@ class JTranslator:
         return value_type
 
 
+
 class JCodeMaker:
 
     CLASS_NAME = 'LLMain'
@@ -647,7 +648,7 @@ class JCodeMaker:
 
     def __init__(self):
         self.commands = []
-        self.return_jtype = 'V'
+        self.return_jtype = VOID_JTYPE
         self.return_label = 'RETURN_LABEL'
         self.label_counter = 0
         self.fields = []
@@ -667,6 +668,14 @@ class JCodeMaker:
         """ Returns code of method with code maked by this maker """
         # add return
         self.command_label(self.return_label)
+        if self.stack_size == 0 and self.return_jtype != VOID_JTYPE:
+            if self.return_jtype == INTEGER_JTYPE:
+                self.command_ldc(0)
+            elif self.return_jtype == INTEGER_LIST_JTYPE:
+                self.command_new(INTEGER_LIST_CLASS)
+                self.command_dup()
+                self.command_invokespecial(INTEGER_LIST_CLASS, '<init>', [], VOID_JTYPE)
+
         self.command_return()
 
         # move locals of method args
