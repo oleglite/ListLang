@@ -3,7 +3,7 @@
 
 __author__ = 'Oleg Beloglazov'
 
-import jtrans
+import jcodemaker
 
 LOG_STR = ''
 
@@ -25,7 +25,7 @@ class Scope:
         self.vars = []
         self.var_types = {}      # dict {var_id: var_type}
         self.funcs = {}     # {function_id: (function_type, function_params_types, function_scope, ...)}
-        self.code_maker = jtrans.JCodeMaker()
+        self.code_maker = jcodemaker.JCodeMaker()
         if global_scope:
             self.global_scope = global_scope
             self.global_vars = []
