@@ -50,7 +50,7 @@ program
 	;
 	
 slist
-	:	NEWLINE? ( statement ( NEWLINE+ | EOF ) )+ -> ^( SLIST statement+ )
+	:	NEWLINE* ( statement ( NEWLINE+ | EOF ) )+ -> ^( SLIST statement+ )
 	;
 
 statement
