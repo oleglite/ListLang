@@ -56,15 +56,18 @@ class JTranslator:
         try:
             var_number = self.scope.vars.index(var_id)
         except ValueError:
-            line, pos = self.get_rule_position()
-            raise error_processor.UnsupportedOperation(line, pos, 'Undefined ID "%s".' % var_id)
+            raise error_processor.UnsupportedOperation(
+                self.get_rule_position(),
+                'Undefined ID "%s".' % var_id
+            )
         return RESERVED_LOCALS + var_number
 
     # RULES
 
     def program(self):
-        return self.scope.code_maker.make_class(self.DEFAULT_STACK_SIZE, RESERVED_LOCALS + len(self.scope.vars),
-                                                ''.join(self.functions_jcode))
+        return self.scope.code_maker.make_class(
+            self.DEFAULT_STACK_SIZE, RESERVED_LOCALS + len(self.scope.vars), ''.join(self.functions_jcode)
+        )
 
     def set_function_return_type(self, return_type):
         self.scope.code_maker.return_jtype = _type_map[return_type]
@@ -77,7 +80,6 @@ class JTranslator:
         )
         self.functions_jcode.append(f_jcode)
 
-
     def for_operation_begin(self, iter_id, value_type):
         if value_type != LIST:
             line, pos = self.get_rule_position()
@@ -87,8 +89,9 @@ class JTranslator:
 
         for_begin_label = self.scope.code_maker.make_label(self.scope.scope_number, 'FOR_BEGIN')
         for_end_label = self.scope.code_maker.make_label(self.scope.scope_number, 'FOR_END')
+        current_stack_size = self.scope.code_maker.stack_size
 
-        self.for_labels_stack.append((for_begin_label, for_end_label))
+        self.for_labels_stack.append((for_begin_label, for_end_label, current_stack_size + 1))
 
         self.scope.code_maker.command_comment('for_operation_begin')
 
@@ -107,20 +110,23 @@ class JTranslator:
         self.assignment_expr(iter_id, ELEMENT)
 
     def for_operation(self):
-        for_begin_label, for_end_label = self.for_labels_stack.pop()
+        for_begin_label, for_end_label, stack_size = self.for_labels_stack.pop()
 
         self.scope.code_maker.command_comment('for_operation_end')
+
+        while self.scope.code_maker.stack_size > stack_size:
+            self.scope.code_maker.command_pop()
 
         self.scope.code_maker.command_ldc(1)
         self.scope.code_maker.command_iadd()
         self.scope.code_maker.command_goto(for_begin_label)
         self.scope.code_maker.command_label(for_end_label)
 
-        
     def while_operation_begin(self):        
         while_begin_label = self.scope.code_maker.make_label(self.scope.scope_number, 'WHILE_BEGIN')
         while_end_label = self.scope.code_maker.make_label(self.scope.scope_number, 'WHILE_END')
-        self.while_labels_stack.append((while_begin_label, while_end_label))
+        current_stack_size = self.scope.code_maker.stack_size
+        self.while_labels_stack.append((while_begin_label, while_end_label, current_stack_size))
 
         self.scope.code_maker.command_comment('while_operation_begin')
         self.scope.code_maker.command_label(while_begin_label)        
@@ -135,7 +141,10 @@ class JTranslator:
         self.scope.code_maker.command_ifeq(while_end_label)
         
     def while_operation(self):
-        while_begin_label, while_end_label = self.while_labels_stack.pop()
+        while_begin_label, while_end_label, stack_size = self.while_labels_stack.pop()
+
+        while self.scope.code_maker.stack_size > stack_size:
+            self.scope.code_maker.command_pop()
 
         self.scope.code_maker.command_comment('while_operation')
         self.scope.code_maker.command_goto(while_begin_label)
@@ -147,7 +156,8 @@ class JTranslator:
             self.if_labels_stack[-1][1] = else_label
         else:
             if_end_label = self.scope.code_maker.make_label(self.scope.scope_number, 'IF_END')
-            self.if_labels_stack.append([if_end_label, else_label])
+            current_stack_size = self.scope.code_maker.stack_size
+            self.if_labels_stack.append([if_end_label, else_label, current_stack_size - 1])
 
         self.scope.code_maker.command_comment('if_operation_value')
         if value_type == LIST:
@@ -156,14 +166,20 @@ class JTranslator:
         self.scope.code_maker.command_ifeq(else_label)
         
     def if_operation_else(self):
-        if_end_label, else_label = self.if_labels_stack[-1]
+        if_end_label, else_label, stack_size = self.if_labels_stack[-1]
+
+        while self.scope.code_maker.stack_size > stack_size:
+            self.scope.code_maker.command_pop()
 
         self.scope.code_maker.command_comment('if_operation_else')
         self.scope.code_maker.command_goto(if_end_label)
         self.scope.code_maker.command_label(else_label)
 
     def if_operation(self):
-        if_end_label = self.if_labels_stack.pop()[0]
+        if_end_label, else_label, stack_size = self.if_labels_stack.pop()
+
+        while self.scope.code_maker.stack_size > stack_size:
+            self.scope.code_maker.command_pop()
 
         self.scope.code_maker.command_comment('if_operation')
         self.scope.code_maker.command_label(if_end_label)
@@ -183,7 +199,10 @@ class JTranslator:
         self.scope.code_maker.command_invokestatic(JCodeMaker.CLASS_NAME, 'print', [STRING_JTYPE], VOID_JTYPE)
 
     def return_operation(self):
-        self.scope.code_maker.command_return()
+        while self.scope.code_maker.stack_size > 1:
+            self.scope.code_maker.command_pop()
+        return_label = self.scope.code_maker.return_label
+        self.scope.code_maker.command_goto(return_label)
 
     def global_operation(self, var_id):
         self.scope.add_global_var(var_id)
@@ -280,6 +299,8 @@ class JTranslator:
             self.scope.code_maker.command_ldc(1)
             self.scope.code_maker.command_label(eq_end_label)
 
+            self.scope.code_maker.stack_size -= 1
+
         elif type1 == type2 == LIST:
             self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'equal', [INTEGER_LIST_JTYPE], INTEGER_JTYPE)
 
@@ -296,8 +317,10 @@ class JTranslator:
     def relational_expr(self, operator, type1, type2):
         self.scope.code_maker.command_comment('relational_expr %s %s %s' % (type1, operator, type2))
         if type1 == LIST or type2 == LIST:
-            line, pos = self.get_rule_position()
-            raise error_processor.UnsupportedOperation(line, pos, 'Relational operation (%s) for lists is unsupported.' % operator)
+            raise error_processor.UnsupportedOperation(
+                self.get_rule_position(),
+                'Relational operation (%s) for lists is unsupported.' % operator
+            )
 
         rel_true_label = self.scope.code_maker.make_label(self.scope.scope_number, 'REL_TRUE')
         rel_end_label = self.scope.code_maker.make_label(self.scope.scope_number, 'REL_END')
@@ -312,6 +335,8 @@ class JTranslator:
         self.scope.code_maker.command_label(rel_true_label)
         self.scope.code_maker.command_ldc(1)
         self.scope.code_maker.command_label(rel_end_label)
+
+        self.scope.code_maker.stack_size -= 1
 
         return ELEMENT
 
@@ -344,9 +369,10 @@ class JTranslator:
                 self.scope.code_maker.command_isub()
                 return ELEMENT
             else:
-                line, pos = self.get_rule_position()
-                raise error_processor.UnsupportedOperation(line, pos,
-                                           'Additive expression (%s %s %s) is unsupported.' % (type1, operator, type2))
+                raise error_processor.UnsupportedOperation(
+                    self.get_rule_position(),
+                    'Additive expression (%s %s %s) is unsupported.' % (type1, operator, type2)
+                )
 
     def multiplicative_expr(self, operator, type1, type2):
         self.scope.code_maker.command_comment('multiplicative_expr %s %s %s' % (type1, operator, type2))
@@ -385,9 +411,9 @@ class JTranslator:
                 self.scope.code_maker.command_load(INTEGER_LIST_JTYPE, 0)
                 return LIST
 
-        line, pos = self.get_rule_position()
         raise error_processor.UnsupportedOperation(
-            line, pos, 'Multiplicative expression (%s %s %s) is unsupported.' % (type1, operator, type2)
+            self.get_rule_position(),
+            'Multiplicative expression (%s %s %s) is unsupported.' % (type1, operator, type2)
         )
                                    
     def pre_incr_expr(self, value_type):
@@ -398,9 +424,9 @@ class JTranslator:
             self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'addFirst', [INTEGER_JTYPE], VOID_JTYPE)
             return LIST
         else:
-            line, pos = self.get_rule_position()
             raise error_processor.UnsupportedOperation(
-                line, pos, 'Prefix increment operation for type "%s" is unsupported.' % (value_type)
+                self.get_rule_position(),
+                'Prefix increment operation for type "%s" is unsupported.' % (value_type)
             )
             
     def pre_decr_expr(self, value_type):
@@ -409,9 +435,9 @@ class JTranslator:
             self.scope.code_maker.command_dup()
             self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'removeFirst', [], VOID_JTYPE)
             return LIST
-        line, pos = self.get_rule_position()
         raise error_processor.UnsupportedOperation(
-            line, pos, 'Prefix decrement operation for type "%s" is unsupported.' % (value_type)
+            self.get_rule_position(),
+            'Prefix decrement operation for type "%s" is unsupported.' % (value_type)
         )
             
     def post_incr_expr(self, value_type):
@@ -421,9 +447,9 @@ class JTranslator:
             self.scope.code_maker.command_ldc(0)
             self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'addLast', [INTEGER_JTYPE], VOID_JTYPE)
             return LIST
-        line, pos = self.get_rule_position()
         raise error_processor.UnsupportedOperation(
-            line, pos, 'Postfix increment operation for type "%s" is unsupported.' % (value_type)
+            self.get_rule_position(),
+            'Postfix increment operation for type "%s" is unsupported.' % (value_type)
         )
             
     def post_decr_expr(self, value_type):
@@ -432,9 +458,9 @@ class JTranslator:
             self.scope.code_maker.command_dup()
             self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'removeLast', [], VOID_JTYPE)
             return LIST
-        line, pos = self.get_rule_position()
         raise error_processor.UnsupportedOperation(
-            line, pos, 'Postfix decrement operation for type "%s" is unsupported.' % (value_type)
+            self.get_rule_position(),
+            'Postfix decrement operation for type "%s" is unsupported.' % (value_type)
         )
 
     def not_expr(self, value_type):
@@ -445,12 +471,7 @@ class JTranslator:
         false_label = self.scope.code_maker.make_label(self.scope.scope_number, 'BOOL_FALSE')
         end_label = self.scope.code_maker.make_label(self.scope.scope_number, 'BOOL_END')
 
-        self.scope.code_maker.command_ifeq(false_label)
-        self.scope.code_maker.command_ldc(0)
-        self.scope.code_maker.command_goto(end_label)
-        self.scope.code_maker.command_label(false_label)
-        self.scope.code_maker.command_ldc(1)
-        self.scope.code_maker.command_label(end_label)
+        self.scope.code_maker.command_invokestatic(JCodeMaker.CLASS_NAME, 'neg', [INTEGER_JTYPE], INTEGER_JTYPE)
 
         return ELEMENT
 
@@ -468,9 +489,9 @@ class JTranslator:
             )
             return func_type  # function return type
         else:
-            line, pos = self.get_rule_position()
             raise error_processor.FunctionUnfoundException(
-                line, pos, "Can't found function with sugnature %s(%s)." % (func_id, ', '.join(types))
+                self.get_rule_position(),
+                "Can't found function with sugnature %s(%s)." % (func_id, ', '.join(types))
             )
 
 
@@ -510,9 +531,9 @@ class JTranslator:
                 )
                 return LIST
 
-        line, pos = self.get_rule_position()
         raise error_processor.UnsupportedOperation(
-            line, pos, 'Slice expression %s[%s:%s] is unsupported.' % ( list_type, value_type1, value_type2)
+            self.get_rule_position(),
+            'Slice expression %s[%s:%s] is unsupported.' % ( list_type, value_type1, value_type2)
         )
 
 
@@ -530,8 +551,10 @@ class JTranslator:
         self.scope.code_maker.command_comment('list_maker_arg')
 
         if arg_type != ELEMENT:
-            line, pos = self.get_rule_position()
-            raise error_processor.UnsupportedOperation(line, pos, 'Making list of lists is unsupported.')
+            raise error_processor.UnsupportedOperation(
+                self.get_rule_position(),
+                'Making list of lists is unsupported.'
+            )
 
         self.scope.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'addLast', [INTEGER_JTYPE], VOID_JTYPE)
         self.scope.code_maker.command_dup()
@@ -596,6 +619,19 @@ class JCodeMaker:
     invokevirtual java/io/PrintStream/print(Ljava/lang/String;)V
     return
 .end method
+
+; int neg(int)
+.method public static neg(I)I
+    .limit locals 5
+    .limit stack 5
+    iload 0
+    ifeq RET_1
+    ldc 0
+    ireturn
+    RET_1:
+    ldc 1
+    ireturn
+.end method
 '''
 
     JMETHOD_TEMPLATE = '''.method public static %s(%s)%s
@@ -612,9 +648,10 @@ class JCodeMaker:
     def __init__(self):
         self.commands = []
         self.return_jtype = 'V'
-        self.return_added = False
+        self.return_label = 'RETURN_LABEL'
         self.label_counter = 0
         self.fields = []
+        self.stack_size = 0
 
     def make_class(self, stack_size, locals_number, methods_code):
         """ Make Jasmin class with using commands of this maker for main method """
@@ -629,8 +666,8 @@ class JCodeMaker:
     def make_method(self, name, params_jtypes, stack_size, locals_number):
         """ Returns code of method with code maked by this maker """
         # add return
-        if not self.return_added:
-            self.command_return()
+        self.command_label(self.return_label)
+        self.command_return()
 
         # move locals of method args
         self.add_command('', add_first=True)
@@ -652,7 +689,7 @@ class JCodeMaker:
         self.fields.append(field)
 
     def make_field_name(self, name):
-        return 'll_' + name
+        return 'global__' + name
 
     def add_command(self, command, add_first=False):
         if add_first:
@@ -666,18 +703,21 @@ class JCodeMaker:
         """ Jasmin command to load constant on stack """
         command =  'ldc %s' % value
         self.add_command(command)
+        self.stack_size += 1
 
     def command_store(self, value_jtype, var_number, add_first=False):
         """ Jasmin command to pop from stack var and store it in variable """
         instruction = 'istore' if value_jtype == INTEGER_JTYPE else 'astore'
         command =  '%s %s' % (instruction, var_number)
         self.add_command(command, add_first=add_first)
+        self.stack_size -= 1
 
     def command_load(self, value_jtype, var_number, add_first=False):
         """ Jasmin command to push variable to stack """
         instruction =  'iload' if value_jtype == INTEGER_JTYPE else 'aload'
         command = '%s %s' % (instruction, var_number)
         self.add_command(command, add_first=add_first)
+        self.stack_size += 1
 
 
     def command_return(self):
@@ -690,20 +730,24 @@ class JCodeMaker:
             instruction = 'return'
         command = instruction
         self.add_command(command)
+        self.stack_size -= 1
         self.return_added = True
 
     def command_new(self, full_class_name):
         """ Jasmin command new """
         command = 'new ' + full_class_name
         self.add_command(command)
+        self.stack_size += 1
 
     def command_dup(self):
         """ Jasmin command to duplicate top value on stack """
         self.add_command('dup')
+        self.stack_size += 1
 
     def command_pop(self):
         """ Jasmin command to pop top value from stack """
         self.add_command('pop')
+        self.stack_size -= 1
 
     def command_swap(self):
         """ Jasmin command to swap two values on top """
@@ -713,71 +757,95 @@ class JCodeMaker:
         """ Jasmin command to invoke special methods of objects (constructors, ...) """
         command = self.INVOKE_TEMPLATE % ('invokespecial', full_class_name, method, ''.join(jparams), return_jtype)
         self.add_command(command)
+        self.stack_size -= len(jparams) + 1
+        if return_jtype != VOID_JTYPE:
+            self.stack_size += 1
 
     def command_invokevirtual(self, full_class_name, method, jparams, return_jtype):
         """ Jasmin command to invoke virtual methods of objects """
         command = self.INVOKE_TEMPLATE % ('invokevirtual', full_class_name, method, ''.join(jparams), return_jtype)
         self.add_command(command)
+        self.stack_size -= len(jparams) + 1
+        if return_jtype != VOID_JTYPE:
+            self.stack_size += 1
 
     def command_invokestatic(self, full_class_name, method, jparams, return_jtype):
         command = self.INVOKE_TEMPLATE % ('invokestatic', full_class_name, method, ''.join(jparams), return_jtype)
         self.add_command(command)
+        self.stack_size -= len(jparams)
+        if return_jtype != VOID_JTYPE:
+            self.stack_size += 1
 
     def command_ifgt(self, label):
         self.add_command('ifgt ' + label)
+        self.stack_size -= 1
 
     def command_ifne(self, label):
         self.add_command('ifne ' + label)
+        self.stack_size -= 1
 
     def command_ifeq(self, label):
         self.add_command('ifeq ' + label)
+        self.stack_size -= 1
 
     def command_goto(self, label):
         self.add_command('goto ' + label)
 
     def command_if_icmpeq(self, label):
         self.add_command('if_icmpeq ' + label)
+        self.stack_size -= 2
 
     def command_if_icmplt(self, label):
         self.add_command('if_icmplt ' + label)
+        self.stack_size -= 2
 
     def command_if_icmpge(self, label):
         self.add_command('if_icmpge ' + label)
+        self.stack_size -= 2
 
     def command_if_icmpgt(self, label):
         self.add_command('if_icmpgt ' + label)
+        self.stack_size -= 2
 
     def command_if_icmple(self, label):
         self.add_command('if_icmple ' + label)
+        self.stack_size -= 2
 
     def command_label(self, label):
         self.add_command('\n%s:' % label)
 
     def command_iadd(self):
         self.add_command('iadd')
+        self.stack_size -= 1
 
     def command_isub(self):
         self.add_command('isub')
+        self.stack_size -= 1
 
     def command_imul(self):
         self.add_command('imul')
+        self.stack_size -= 1
 
     def command_idiv(self):
         self.add_command('idiv')
+        self.stack_size -= 1
 
     def command_irem(self):
         self.add_command('irem')
+        self.stack_size -= 1
 
     def command_ineg(self):
         self.add_command('ineg')
 
     def command_comment(self, comment):
-        self.add_command('\n\t; ' + comment)
+        self.add_command('\n\t; %s; stack=%i' % (comment, self.stack_size))
 
     def command_putstatic(self, jclass, field, jtype):
         self.add_command('putstatic %s/%s %s' % (jclass, field, jtype))
+        self.stack_size -= 1
 
     def command_getstatic(self, jclass, field, jtype):
         self.add_command('getstatic %s/%s %s' % (jclass, field, jtype))
+        self.stack_size += 1
 
 

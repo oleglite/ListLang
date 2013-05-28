@@ -29,9 +29,9 @@ def get_all_errors():
 
 
 class SemanticException(Exception):
-    def __init__(self, line, pos_in_line, message):
-        self.line = line
-        self.pos_in_line = pos_in_line
+    def __init__(self, position, message):
+        self.line = position[0]
+        self.pos_in_line = position[1]
         self.message = message
 
 
