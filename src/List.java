@@ -49,7 +49,7 @@ public class List {
 		mList.remove(mList.size() - 1);
 	}
 	
-	public void del(int i) {
+	public void delete(int i) {
 		mList.remove(i);
 	}
 	
@@ -111,7 +111,7 @@ public class List {
 		int i = 0;
 		while(i < result.len()) {
 			if(result.get(i) == n) {
-				result.del(i);
+				result.delete(i);
 			} else {
 				i++;
 			}
@@ -125,7 +125,7 @@ public class List {
 	}
 
 	public List pre_decr() {
-		del(0);
+		delete(0);
 		return this;
 	}
 
@@ -135,7 +135,7 @@ public class List {
 	}
 
 	public List post_decr() {
-		del(len() - 1);
+		delete(len() - 1);
 		return this;
 	}
 }
