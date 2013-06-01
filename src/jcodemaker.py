@@ -76,12 +76,15 @@ class JCodeMaker:
     def make_class(self, stack_size, locals_number, methods_code):
         """ Make Jasmin class with using commands of this maker for main method """
         fields = '\n'.join(self.fields) + '\n'
+        bultin_functions_jcode = '\n'.join([func_jcode[2] for func_jcode in BUILTIN_FUNCTIONS.values()])
         return (self.CLASS_HEADER +
                 fields +
                 self.CLASS_INIT +
                 self.make_method('main', ['[Ljava/lang/String;'], stack_size, locals_number) +
                 methods_code +
-                self.BUILTIN_METHODS)
+                self.BUILTIN_METHODS +
+                bultin_functions_jcode
+        )
 
     def make_method(self, name, params_jtypes, stack_size, locals_number):
         """ Returns code of method with code maked by this maker """
@@ -102,6 +105,8 @@ class JCodeMaker:
         for i, param_jtype in enumerate(params_jtypes):
             # reverse order of calls since adding first
             self.command_store(param_jtype, RESERVED_LOCALS + i, add_first=True)
+            if param_jtype == INTEGER_LIST_JTYPE:
+                self.command_invokevirtual(INTEGER_LIST_CLASS, 'clone', [], INTEGER_LIST_JTYPE, add_first=True)
             self.command_load(param_jtype, i, add_first=True)
 
 
@@ -185,9 +190,9 @@ class JCodeMaker:
         self.command_invoke('invokespecial', full_class_name, method, jparams, return_jtype)
         self.stack_size -= len(jparams) + 1
 
-    def command_invokevirtual(self, full_class_name, method, jparams, return_jtype):
+    def command_invokevirtual(self, full_class_name, method, jparams, return_jtype, add_first=False):
         """ Jasmin command to invoke virtual methods of objects """
-        self.command_invoke('invokevirtual', full_class_name, method, jparams, return_jtype)
+        self.command_invoke('invokevirtual', full_class_name, method, jparams, return_jtype, add_first=add_first)
         self.stack_size -= len(jparams) + 1
 
     def command_invokestatic(self, full_class_name, method, jparams, return_jtype):
@@ -195,9 +200,9 @@ class JCodeMaker:
         self.command_invoke('invokestatic', full_class_name, method, jparams, return_jtype)
         self.stack_size -= len(jparams)
 
-    def command_invoke(self, invoke_instr, full_class_name, method, jparams, return_jtype):
+    def command_invoke(self, invoke_instr, full_class_name, method, jparams, return_jtype, add_first=False):
         command = '%s %s/%s(%s)%s' % (invoke_instr, full_class_name, method, ''.join(jparams), return_jtype)
-        self.add_command(command)
+        self.add_command(command, add_first=add_first)
         if return_jtype != VOID_JTYPE:
             self.stack_size += 1
 
@@ -274,6 +279,30 @@ class JCodeMaker:
         self.stack_size += 1
 
 
+BUILTIN_FUNCTIONS = {
+
+    'len': (ELEMENT, [LIST],
+        '''.method public static len(Llistlang/objects/List;)I
+    .limit locals 5
+    .limit stack 5
+    aload 0
+    invokevirtual listlang/objects/List/len()I
+    ireturn
+.end method'''),
+
+    'count': (ELEMENT, [LIST, ELEMENT],
+            '''.method public static count(Llistlang/objects/List;I)I
+        .limit locals 5
+        .limit stack 5
+        aload 0
+        iload 1
+        invokevirtual listlang/objects/List/count(I)I
+        ireturn
+    .end method''')
+
+}
+
+
 class ListJavaMediator:
 
     def __init__(self, code_maker):
@@ -318,6 +347,9 @@ class ListJavaMediator:
     def removeLast(self):
         self.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'removeLast', [], VOID_JTYPE)
 
+    def clone(self):
+        self.code_maker.command_invokevirtual(INTEGER_LIST_CLASS, 'clone', [], INTEGER_LIST_JTYPE)
+
     def new(self):
         self.code_maker.command_new(INTEGER_LIST_CLASS)
         self.code_maker.command_dup()
@@ -327,3 +359,20 @@ class ListJavaMediator:
         self.code_maker.command_invokevirtual(
             INTEGER_LIST_CLASS, 'slice', [INTEGER_JTYPE, INTEGER_JTYPE], INTEGER_LIST_JTYPE
         )
+
+
+class StackCleaner:
+
+    def __init__(self, code_maker):
+        self.code_maker = code_maker
+        self.stack_size = code_maker.stack_size
+
+    def cleanup(self):
+        self.code_maker.command_comment('start cleanup')
+        while self.code_maker.stack_size > self.stack_size:
+            self.code_maker.command_pop()
+        self.code_maker.command_comment('end cleanup')
+
+    def cleanall(self):
+        while self.code_maker.stack_size > 0:
+            self.code_maker.command_pop()

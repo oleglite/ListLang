@@ -20,6 +20,16 @@ public class List {
 		System.out.print("[" + str + "]");
 	}
 	
+	public int count(int n) {
+		int n_count = 0;
+		for(int val : mList) {
+			if(val == n) {
+				n_count++;
+			}
+		}
+		return n_count;
+	}
+	
 	@SuppressWarnings("unchecked")
 	public List(LinkedList<Integer> linkedList) {
 		mList = (LinkedList<Integer>) linkedList.clone();

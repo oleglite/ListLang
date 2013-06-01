@@ -17,9 +17,9 @@ class JTranslator:
         self.scopes_stack = []
         self.walker = None
         
-        self.while_labels_stack = []
-        self.for_labels_stack = []
-        self.if_labels_stack = []
+        self.while_stack = []
+        self.for_stack = []
+        self.if_stack = []
 
     def enter_scope(self, scope):
         self.scopes_stack.append(scope)
@@ -63,6 +63,11 @@ class JTranslator:
         self.code_maker.return_jtype = type_map[return_type]
 
     def function(self, f_id, f_params, f_scope):
+        if f_id in jcodemaker.BUILTIN_FUNCTIONS:
+            raise error_processor.BuiltinConflictException(
+                self.get_rule_position(), 'Id "%s" is builtin function id.' % f_id
+            )
+
         f_translated_params = [type_map[type] for id, type in f_params]
         f_jcode = f_scope.code_maker.make_method(
             self.scope.get_function_code_name(f_id), f_translated_params,
@@ -70,108 +75,138 @@ class JTranslator:
         )
         self.functions_jcode.append(f_jcode)
 
-    def for_operation_begin(self, iter_id, value_type):
+    def for_operation_begin(self, iter_id, value_type): # stack: 1
         if value_type != LIST:
-            line, pos = self.get_rule_position()
             raise error_processor.UnsupportedOperation(
-                line, pos, '"for" operation with "in" type %s is unsupported' % value_type
+                self.get_rule_position(), '"for" operation with "in" type %s is unsupported' % value_type
             )
 
         for_begin_label = self.code_maker.make_label(self.scope.scope_number, 'FOR_BEGIN')
         for_end_label = self.code_maker.make_label(self.scope.scope_number, 'FOR_END')
-        current_stack_size = self.code_maker.stack_size
 
-        self.for_labels_stack.append((for_begin_label, for_end_label, current_stack_size + 1))
 
         self.code_maker.command_comment('for_operation_begin')
 
         self.code_maker.command_ldc(0)  # iterator
+        # stack: 2 (list, iter)
         self.code_maker.command_label(for_begin_label)
         self.code_maker.command_store(INTEGER_JTYPE, TEMPORARY_STORE_VAR_1)  # save iterator
         self.code_maker.command_dup()  # duplicate list
         self.code_maker.list.len()
         self.code_maker.command_load(INTEGER_JTYPE, TEMPORARY_STORE_VAR_1)
+        # stack: 3 (list, list_len, iter)
         self.code_maker.command_if_icmple(for_end_label)
+        # stack: 1 (list)
         self.code_maker.command_dup()  # duplicate list
         self.code_maker.command_load(INTEGER_JTYPE, TEMPORARY_STORE_VAR_1)
         self.code_maker.list.get()
+        # stack: 2 (list, element)
         self.code_maker.command_load(INTEGER_JTYPE, TEMPORARY_STORE_VAR_1)
         self.code_maker.command_swap()
+        # stack: 3 (list, iter, element)
         self.assignment_expr(iter_id, ELEMENT)
+        # stack: 2 (list, iter)
+
+        cleaner = jcodemaker.StackCleaner(self.code_maker)
+        self.for_stack.append([for_begin_label, for_end_label, cleaner])
 
     def for_operation(self):
-        for_begin_label, for_end_label, stack_size = self.for_labels_stack.pop()
+        for_begin_label, for_end_label, cleaner = self.for_stack.pop()
 
         self.code_maker.command_comment('for_operation_end')
 
-        while self.code_maker.stack_size > stack_size:
-            self.code_maker.command_pop()
+        cleaner.cleanup()
 
+        # stack: 2 (list, iter)
         self.code_maker.command_ldc(1)
         self.code_maker.command_iadd()
+        # stack: 2 (list, iter)
         self.code_maker.command_goto(for_begin_label)
-        self.code_maker.command_label(for_end_label)
 
-    def while_operation_begin(self):        
+        self.code_maker.command_label(for_end_label)
+        self.code_maker.stack_size -= 1
+        # stack: 1 (list)
+        self.code_maker.command_pop()   # pop out iterating list from stack
+
+    def while_operation_begin(self): # stack: 0
         while_begin_label = self.code_maker.make_label(self.scope.scope_number, 'WHILE_BEGIN')
         while_end_label = self.code_maker.make_label(self.scope.scope_number, 'WHILE_END')
-        current_stack_size = self.code_maker.stack_size
-        self.while_labels_stack.append((while_begin_label, while_end_label, current_stack_size))
 
         self.code_maker.command_comment('while_operation_begin')
         self.code_maker.command_label(while_begin_label)
+        # stack: 0
+
+        self.while_stack.append([while_begin_label, while_end_label, None])
         
-    def while_operation_value(self, value_type):
-        while_end_label = self.while_labels_stack[-1][1]
+    def while_operation_value(self, value_type): # stack: 1
+        while_end_label = self.while_stack[-1][1]
 
         self.code_maker.command_comment('while_operation_value')
+
+        # stack: 1 (value)
         if value_type == LIST:
             self.code_maker.list.to_int()
+        # stack: 1 (element)
             
         self.code_maker.command_ifeq(while_end_label)
-        
-    def while_operation(self):
-        while_begin_label, while_end_label, stack_size = self.while_labels_stack.pop()
+        # stack: 0
 
-        while self.code_maker.stack_size > stack_size:
-            self.code_maker.command_pop()
+        cleaner = jcodemaker.StackCleaner(self.code_maker)
+        self.while_stack[-1][2] = cleaner
+
+        
+    def while_operation(self): # stack: 0
+        while_begin_label, while_end_label, cleaner = self.while_stack.pop()
 
         self.code_maker.command_comment('while_operation')
+
+        cleaner.cleanup()
+        # stack: 0
         self.code_maker.command_goto(while_begin_label)
+
         self.code_maker.command_label(while_end_label)
+        # stack: 0
         
-    def if_operation_value(self, value_type, is_elif=False):
+    def if_operation_value(self, value_type, is_elif=False): # stack: 1
         else_label = self.code_maker.make_label(self.scope.scope_number, 'ELSE')
-        if is_elif:
-            self.if_labels_stack[-1][1] = else_label
-        else:
-            if_end_label = self.code_maker.make_label(self.scope.scope_number, 'IF_END')
-            current_stack_size = self.code_maker.stack_size
-            self.if_labels_stack.append([if_end_label, else_label, current_stack_size - 1])
 
         self.code_maker.command_comment('if_operation_value')
+
+        # stack: 1 (value)
         if value_type == LIST:
             self.code_maker.list.to_int()
+        # stack: 1 (element)
             
         self.code_maker.command_ifeq(else_label)
-        
-    def if_operation_else(self):
-        if_end_label, else_label, stack_size = self.if_labels_stack[-1]
+        # stack: 0
 
-        while self.code_maker.stack_size > stack_size:
-            self.code_maker.command_pop()
+        cleaner = jcodemaker.StackCleaner(self.code_maker)
+
+        if is_elif:
+            self.if_stack[-1][1] = else_label
+            self.if_stack[-1][2] = cleaner
+        else:
+            if_end_label = self.code_maker.make_label(self.scope.scope_number, 'IF_END')
+            self.if_stack.append([if_end_label, else_label, cleaner])
+
+    def if_operation_else(self):
+        if_end_label, else_label, cleaner = self.if_stack[-1]
 
         self.code_maker.command_comment('if_operation_else')
+        cleaner.cleanup()
+
+        # stack: 0
         self.code_maker.command_goto(if_end_label)
+
         self.code_maker.command_label(else_label)
+        # stack: 0
 
     def if_operation(self):
-        if_end_label, else_label, stack_size = self.if_labels_stack.pop()
-
-        while self.code_maker.stack_size > stack_size:
-            self.code_maker.command_pop()
+        if_end_label, else_label, cleaner = self.if_stack.pop()
 
         self.code_maker.command_comment('if_operation')
+        cleaner.cleanup()
+        # stack: 0
         self.code_maker.command_label(if_end_label)
 
     def print_value(self, value_type):
@@ -195,6 +230,16 @@ class JTranslator:
         self.code_maker.command_goto(return_label)
 
     def global_operation(self, var_id):
+        if self.scope.is_global():
+            raise error_processor.GlobalOperationException(
+                self.get_rule_position(),
+                'using global operation for variable %s in global scope.' % var_id
+            )
+        if var_id not in self.scopes_stack[0].vars:
+            raise error_processor.UndefinedIDException(
+                self.get_rule_position(),
+                'variable "%s" not defined in global scope.' % (var_id)
+            )
         self.scope.add_global_var(var_id)
 
     def assignment_expr(self, var_id, value_type):
@@ -462,12 +507,31 @@ class JTranslator:
     def call_expr(self, func_id, types):
         self.code_maker.command_comment('call_expr %s(%s)' % (func_id, ', '.join(types)))
 
-        func_description = self.scope.funcs.get(func_id)
+        f_translated_params = [type_map[type] for type in types]
+
+        # Check if calling function is builtin function
+        if func_id in jcodemaker.BUILTIN_FUNCTIONS:
+            builtin_retrutn_type, builtin_types = jcodemaker.BUILTIN_FUNCTIONS[func_id][0:2]
+            if builtin_types == types:
+                self.code_maker.command_invokestatic(
+                    TARGET_CLASS_NAME, func_id, f_translated_params, type_map[builtin_retrutn_type]
+                )
+                return builtin_retrutn_type
+            else:
+                raise error_processor.BuiltinConflictException(
+                    self.get_rule_position(), 'wrong args in calling builtin function %s.' % func_id
+                )
+
+        # Try to find function in one of scopes in stack from last to first
+        func_description = None
+        for scope in reversed(self.scopes_stack):
+            if func_id in scope.funcs:
+                func_description = scope.funcs[func_id]
+                break
 
         if func_description and func_description[1] == types:
             func_type = func_description[0]
-            jmethod_id = self.scope.get_function_code_name(func_id)
-            f_translated_params = [type_map[type] for type in types]
+            jmethod_id = scope.get_function_code_name(func_id)
             self.code_maker.command_invokestatic(
                 TARGET_CLASS_NAME, jmethod_id, f_translated_params, type_map[func_type]
             )
@@ -547,7 +611,17 @@ class JTranslator:
         return ELEMENT
 
     def var_identifier(self, id):
+
+        is_global_scope = self.scope.is_global()
+
+        if not self.scope.contains_var(id):
+            raise error_processor.UndefinedIDException(
+                self.get_rule_position(),
+                'variable "%s" not defined.' % (id)
+            )
+
         if self.scope.is_global() or id in self.scope.global_vars:
+
             field_name = self.code_maker.make_field_name(id)
             value_type = self.scope.global_scope.var_types[id]
             field_jtype = type_map[value_type]

@@ -50,3 +50,6 @@ class Scope:
 
     def get_function_code_name(self, name):
         return 's%i_%s' % (self.scope_number, name)
+
+    def contains_var(self, var_id):
+        return var_id in self.vars or (not self.is_global() and var_id in self.global_vars)

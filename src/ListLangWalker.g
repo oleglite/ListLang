@@ -58,8 +58,8 @@ scope {
 	:	^( FUNCTION TYPE ID param* 
 			{for p_id, p_type in $function::params: $function::function_scope.add_var(p_id, p_type)}
 			{translator.set_function_return_type($TYPE.text)}
-		function_slist ) 
 			{$slist::local_scope.add_function($ID.text, $TYPE.text, $function::params, $function::function_scope)}
+		function_slist ) 			
 			{translator.leave_scope()}
 			{translator.function($ID.text, $function::params, $function::function_scope)}
 	;
