@@ -59,10 +59,8 @@ class JTranslator:
             self.DEFAULT_STACK_SIZE, RESERVED_LOCALS + len(self.scope.vars), ''.join(self.functions_jcode)
         )
 
-    def set_function_return_type(self, return_type):
-        self.code_maker.return_jtype = type_map[return_type]
-
-    def function(self, f_id, f_params, f_scope):
+    def function(self, f_params, f_scope):
+        f_id = f_scope.scope_name
         if f_id in jcodemaker.BUILTIN_FUNCTIONS:
             raise error_processor.BuiltinConflictException(
                 self.get_rule_position(), 'Id "%s" is builtin function id.' % f_id
@@ -223,11 +221,36 @@ class JTranslator:
         self.code_maker.command_ldc('"\\n"')
         self.code_maker.command_invokestatic(TARGET_CLASS_NAME, 'print', [STRING_JTYPE], VOID_JTYPE)
 
-    def return_operation(self):
-        while self.code_maker.stack_size > 1:
+    def return_operation(self, value_type):
+        if self.scope.is_global():
+            required_stack_size = 0
+        else:
+            required_stack_size = 1
+            if not value_type:
+                self.code_maker.command_ldc(0)
+            self.__set_function_return_type(value_type if value_type else ELEMENT)
+
+        while self.code_maker.stack_size > required_stack_size:
             self.code_maker.command_pop()
         return_label = self.code_maker.return_label
         self.code_maker.command_goto(return_label)
+
+    def __set_function_return_type(self, return_type):
+        return_jtype = type_map[return_type]
+
+        if self.code_maker.return_jtype == VOID_JTYPE:
+            self.code_maker.return_jtype = return_jtype
+            function_id = self.scope.scope_name
+            self.scopes_stack[-2].set_function_return_type(function_id, return_type)
+
+        elif self.code_maker.return_jtype != return_jtype:
+            raise error_processor.ReturnTypeException(
+                self.get_rule_position(),
+                'Function must return object of type %s in "%s" scope.' % (
+                    self.code_maker.return_jtype, self.scope.scope_name
+                )
+            )
+
 
     def global_operation(self, var_id):
         if self.scope.is_global():

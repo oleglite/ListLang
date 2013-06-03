@@ -9,7 +9,7 @@ options {
 @header {
 	import ll_scope
 	import jtrans
-	from ll_scope import Scope, log
+	from ll_scope import Scope
 	
 	translator = jtrans.JTranslator()
 }
@@ -52,16 +52,16 @@ scope {
 }
 @init {
 	$function::params = []
-	$function::function_scope = Scope($program::global_scope)
-	translator.enter_scope($function::function_scope)
+	$function::function_scope = None
 }
-	:	^( FUNCTION TYPE ID param* 
+	:	^( DEFINE ID param* 
+			{$function::function_scope = Scope(scope_name=$ID.text, global_scope=$program::global_scope)}
+			{translator.enter_scope($function::function_scope)}			
 			{for p_id, p_type in $function::params: $function::function_scope.add_var(p_id, p_type)}
-			{translator.set_function_return_type($TYPE.text)}
-			{$slist::local_scope.add_function($ID.text, $TYPE.text, $function::params, $function::function_scope)}
-		function_slist ) 			
+			{$slist::local_scope.add_function($function::params, $function::function_scope)}
+		function_slist )
 			{translator.leave_scope()}
-			{translator.function($ID.text, $function::params, $function::function_scope)}
+			{translator.function($function::params, $function::function_scope)}
 	;
 	
 function_slist
@@ -102,8 +102,8 @@ operation
 			{translator.print_value($val.type)}
 		)* ) 
 			{translator.print_operation()}
-	|	^( RETURN rvalue ) 
-			{translator.return_operation()}
+	|	^( RETURN val=rvalue? ) 
+			{translator.return_operation($val.type)}
 			
 	|	^( GLOBAL ID )
 			{translator.global_operation($ID.text)}

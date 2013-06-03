@@ -7,7 +7,6 @@ options {
 
 tokens {
 	SLIST;		// statement list
-	FUNCTION;	// function definition
 	PARAM;		// parameter definiiton
 	CALL;		// call function expression
 	CAST;		// cast expression
@@ -59,7 +58,7 @@ statement
 	;
 
 function
-	:	TYPE ID L_BRACKET params_list R_BRACKET block -> ^( FUNCTION TYPE ID params_list? block )
+	:	DEFINE ID L_BRACKET params_list R_BRACKET block -> ^( DEFINE ID params_list? block )
 	;
 
 params_list
@@ -83,7 +82,7 @@ print_operation
 		;
 
 return_operation
-	:	RETURN^ rvalue
+	:	RETURN^ rvalue?
 	;
 
 global_operation
@@ -197,8 +196,11 @@ element_literal
 
 list_maker
 	:	L_SQUARE_BRACKET args_list R_SQUARE_BRACKET -> ^( LIST_MAKER args_list? )
-	;	
+	;
 	
+
+DEFINE	:	'define'
+	;	
 
 L_BRACKET
 	:	'('
