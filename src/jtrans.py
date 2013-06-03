@@ -554,6 +554,9 @@ class JTranslator:
 
         if func_description and func_description[1] == types:
             func_type = func_description[0]
+            if not func_type:
+                func_type = ELEMENT
+                self.__set_function_return_type(func_type)
             jmethod_id = scope.get_function_code_name(func_id)
             self.code_maker.command_invokestatic(
                 TARGET_CLASS_NAME, jmethod_id, f_translated_params, type_map[func_type]

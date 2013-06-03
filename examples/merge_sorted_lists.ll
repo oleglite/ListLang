@@ -1,5 +1,5 @@
 ﻿// Объединить сортированные списки в сортированный список
-List mergeSortedLists(List l1, List l2) {
+define mergeSortedLists(List l1, List l2) {
 	result = []
 	
 	while 1 {

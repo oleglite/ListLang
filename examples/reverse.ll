@@ -1,4 +1,4 @@
-﻿List reverse(List l) {
+﻿define reverse(List l) {
 	result = []
 	while l {
 		result = l[0] + result

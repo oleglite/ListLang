@@ -1,4 +1,4 @@
-﻿List quickSort(List l) {
+﻿define quickSort(List l) {
 	
 	if not l {
 		return []
