@@ -1,8 +1,4 @@
 
+x = read_list()
 
-define f(){
-	print 1
-	return [1,2]
-}
-
-print f()
+print x + 1

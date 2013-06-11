@@ -1,8 +1,42 @@
 package listlang.objects;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import java.util.LinkedList;
 
 public class List {
+
+	static final Pattern listPattern = Pattern.compile(" *\\[ *\\d+(, *\\d+ *)* *\\] *");
+	static final Pattern numberPattern = Pattern.compile("\\d+");
+
+	public static List read() {
+		List readedList = new List();
+		
+		// read line from stdin
+		BufferedReader bufferedreader = new BufferedReader(new InputStreamReader(System.in)); 
+		String line = "";
+		try {
+			line = bufferedreader.readLine();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		// parse readed line
+		Matcher listMatcher = listPattern.matcher(line);
+		if(listMatcher.matches()) {
+			Matcher numberMatcher = numberPattern.matcher(line);
+
+			while (numberMatcher.find()) {
+				readedList.addLast(Integer.parseInt(numberMatcher.group()));
+			}
+		}
+		
+		return readedList;
+	}
 	
 	private LinkedList<Integer> mList = new LinkedList<Integer>();
 	

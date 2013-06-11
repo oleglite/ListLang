@@ -174,7 +174,7 @@ rvalue returns[type]
 	|	^( CAST TYPE val=rvalue ) 
 			{$type = translator.cast_expr($val.type, $TYPE.text)}
 	
-	|	^( L_SQUARE_BRACKET list_val=rvalue val1=rvalue val2=rvalue? )
+	|	^( L_SQUARE_BRACKET list_val=rvalue val1=rvalue COLON? val2=rvalue? )
 			{$type = translator.slice_expr($list_val.type, $val1.type, $val2.type)}
 	
 	|	^( LIST_MAKER			{translator.list_maker_begin()}

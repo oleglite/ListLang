@@ -166,7 +166,7 @@ postfix_expr
 	;
 	
 slice_expr
-	:	primary_expr ( L_SQUARE_BRACKET^ primary_expr ( COLON! primary_expr? )? R_SQUARE_BRACKET! )?
+	:	primary_expr ( L_SQUARE_BRACKET^ primary_expr ( COLON primary_expr? )? R_SQUARE_BRACKET! )?
 	;
 
 primary_expr

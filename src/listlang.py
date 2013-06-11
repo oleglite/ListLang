@@ -18,8 +18,6 @@ from ListLangParser import ListLangParser
 from ListLangWalker import ListLangWalker
 
 
-
-
 def tokens_out(tokens, tokens_filename):
     dir_name = os.path.dirname(tokens_filename)
     if not os.path.exists(dir_name):
@@ -38,11 +36,6 @@ def getChildren(tree):
     return [tree.getChild(i) for i in xrange(tree.getChildCount())]
 
 
-def test_examples(examples_dir):
-    # FIXME: реализовать функцию
-    pass
-
-
 def main():
     # Parse command line arguments
     args_parser = argparse.ArgumentParser(description='Compile listlang source files.')
@@ -52,8 +45,8 @@ def main():
     args_parser.add_argument('--expamles', '-e', dest='examples_dir', help='try to parse examples, print errors if exists')
     args = args_parser.parse_args()
 
-    if args.examples_dir:
-        test_examples(args.examples_dir)
+    # if args.examples_dir:
+    #     test_examples(args.examples_dir)
 
     # Run lexer
     char_stream = antlr3.ANTLRFileStream(args.src_filename, encoding='utf8')

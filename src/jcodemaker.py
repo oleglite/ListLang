@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+from xml.etree.ElementTree import Element
 
 __author__ = 'Oleg Beloglazov'
 
@@ -40,6 +41,8 @@ class JCodeMaker:
     invokevirtual java/io/PrintStream/print(Ljava/lang/String;)V
     return
 .end method
+
+
 
 ; int neg(int)
 .method public static neg(I)I
@@ -298,7 +301,29 @@ BUILTIN_FUNCTIONS = {
         iload 1
         invokevirtual listlang/objects/List/count(I)I
         ireturn
-    .end method''')
+    .end method'''),
+
+    'read_element': (ELEMENT, [], '''.method public static read_element()I
+    .limit locals 10
+    .limit stack 10
+
+    new java/util/Scanner
+	dup
+	getstatic java/lang/System/in Ljava/io/InputStream;
+	invokespecial java/util/Scanner/<init>(Ljava/io/InputStream;)V
+	invokevirtual java/util/Scanner/nextInt()I
+
+    ireturn
+.end method'''),
+
+     'read_list': (LIST, [], '''.method public static read_list()Llistlang/objects/List;
+    .limit locals 10
+    .limit stack 10
+
+	invokestatic listlang/objects/List/read()Llistlang/objects/List;
+
+    areturn
+.end method''')
 
 }
 
