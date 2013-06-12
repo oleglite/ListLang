@@ -1,10 +1,12 @@
 tmp/
+build/
+jasmin.jar
 
 # generated files
-src/ListLangLexer.py
-src/ListLangParser.py
-src/ListLangWalker.py
-src/*.tokens
+src/llcompiler/ListLangLexer.py
+src/llcompiler/ListLangParser.py
+src/llcompiler/ListLangWalker.py
+src/llcompiler/*.tokens
 
 ######################## Python
 *.py[cod]

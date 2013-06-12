@@ -39,5 +39,6 @@ class UndefinedIDException(SemanticException): pass
 class UnsupportedOperation(SemanticException): pass
 class FunctionUnfoundException(SemanticException): pass
 class BuiltinConflictException(SemanticException): pass
+class FunctionConflictException(SemanticException): pass
 class GlobalOperationException(SemanticException): pass
 class ReturnTypeException(SemanticException): pass

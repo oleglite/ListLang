@@ -3,8 +3,7 @@
 
 __author__ = 'Oleg Beloglazov'
 
-import error_processor
-import jcodemaker
+import error_processor, jcodemaker
 from globals import *
 
 
@@ -64,6 +63,11 @@ class JTranslator:
         if f_id in jcodemaker.BUILTIN_FUNCTIONS:
             raise error_processor.BuiltinConflictException(
                 self.get_rule_position(), 'Id "%s" is builtin function id.' % f_id
+            )
+
+        if f_id in self.scope.funcs:
+            raise error_processor.FunctionConflictException(
+                self.get_rule_position(), 'Function with id "%s" already exists in this scope.' % f_id
             )
 
         f_translated_params = [type_map[type] for id, type in f_params]
